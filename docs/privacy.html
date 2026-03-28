@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitScope - Privacy Policy</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #1f2328; }
+  h1 { border-bottom: 1px solid #d1d9e0; padding-bottom: 8px; }
+  h2 { margin-top: 32px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d9e0; padding: 8px 12px; text-align: left; }
+  th { background: #f6f8fa; }
+  a { color: #0969da; }
+  code { background: #f6f8fa; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  ol { padding-left: 24px; }
+</style>
+</head>
+<body>
+<h1>Privacy Policy</h1>
+<p><strong>GitScope</strong> - Chrome Extension</p>
+<p>Last updated: March 28, 2026</p>
+
+<h2>Data Collection</h2>
+<p>This extension does <strong>not</strong> collect, store, or transmit any personal data to the developer or any third party.</p>
+
+<h2>What Data Is Accessed</h2>
+<p>The extension accesses the following data from GitHub's public API:</p>
+<ul>
+  <li>Public profile information (name, username, avatar, follower/following counts)</li>
+  <li>Public repository data (names, stars, languages, fork counts)</li>
+  <li>Contribution calendar data (contribution counts by date)</li>
+  <li>Pull request counts (merged, open, closed)</li>
+  <li>Issue counts</li>
+</ul>
+<p>This data is fetched from GitHub's GraphQL API (<code>api.github.com</code>) using your authenticated session and is only used to render the insights dashboard on profile pages.</p>
+
+<h2>Authentication</h2>
+<ul>
+  <li>Authentication is handled via GitHub's standard OAuth 2.0 flow</li>
+  <li>The OAuth token exchange is processed by a Cloudflare Worker (<code>gpi-auth.sg85207.workers.dev</code>)</li>
+  <li>The Cloudflare Worker only exchanges the authorization code for an access token - it does not store, log, or retain any tokens or user data</li>
+  <li>Your access token is stored locally in your browser via <code>chrome.storage.sync</code></li>
+</ul>
+
+<h2>Data Storage</h2>
+<ul>
+  <li><strong>OAuth token</strong>: Stored in <code>chrome.storage.sync</code> (local to your browser, synced across your Chrome instances if signed in)</li>
+  <li><strong>API cache</strong>: Profile data is cached in <code>chrome.storage.local</code> for 5 minutes to reduce API calls. Cache is automatically cleared after expiry.</li>
+  <li>No data is stored on any external server</li>
+</ul>
+
+<h2>Network Requests</h2>
+<p>The extension only communicates with:</p>
+<ol>
+  <li><code>api.github.com</code> - To fetch profile data via GitHub's GraphQL API</li>
+  <li><code>gpi-auth.sg85207.workers.dev</code> - OAuth token exchange only (during sign-in)</li>
+</ol>
+<p>No other network requests are made. No analytics, telemetry, or tracking services are used.</p>
+
+<h2>Permissions</h2>
+<table>
+  <tr><th>Permission</th><th>Purpose</th></tr>
+  <tr><td><code>storage</code></td><td>Store OAuth token and cache API responses locally</td></tr>
+  <tr><td><code>api.github.com</code> (host permission)</td><td>Fetch profile data from GitHub's API</td></tr>
+</table>
+
+<h2>Third-Party Services</h2>
+<ul>
+  <li><strong>GitHub API</strong> (api.github.com) - Used to fetch public profile and contribution data. Subject to <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's Privacy Statement</a>.</li>
+  <li><strong>Cloudflare Workers</strong> (gpi-auth.sg85207.workers.dev) - Used solely for OAuth token exchange during sign-in. No data is logged or retained.</li>
+</ul>
+
+<h2>Data Deletion</h2>
+<p>To remove all data stored by this extension:</p>
+<ol>
+  <li>Click the extension icon and click <strong>Sign Out</strong> (clears the OAuth token)</li>
+  <li>Uninstall the extension from <code>chrome://extensions</code> (clears all stored data including cache)</li>
+</ol>
+
+<h2>Open Source</h2>
+<p>This extension is fully open source. You can audit the complete source code at: <a href="https://github.com/Sagargupta16/GitScope">github.com/Sagargupta16/GitScope</a></p>
+
+<h2>Contact</h2>
+<p>For privacy questions or concerns, open an issue at: <a href="https://github.com/Sagargupta16/GitScope/issues">github.com/Sagargupta16/GitScope/issues</a></p>
+</body>
+</html>
