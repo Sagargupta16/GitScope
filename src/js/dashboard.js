@@ -56,8 +56,8 @@ export function buildInsightsPanel(data) {
 
   // Header
   panel.appendChild(el("div", "gpi-header",
-    `<span class="gpi-title">Profile Insights</span>` +
-    `<span class="gpi-badge">by Profile Insights for GitHub</span>`
+    `<span class="gpi-title">GitScope</span>` +
+    `<span class="gpi-badge">gitscope</span>`
   ));
 
   // Stats grid
@@ -183,7 +183,7 @@ export function showTokenPrompt() {
   const prompt = el("div", "gpi-panel gpi-token-prompt");
   prompt.id = "gpi-panel";
   prompt.innerHTML =
-    `<div class="gpi-header"><span class="gpi-title">Profile Insights</span></div>` +
+    `<div class="gpi-header"><span class="gpi-title">GitScope</span></div>` +
     `<div class="gpi-section">` +
     `<p class="gpi-prompt-text">Sign in with GitHub via the extension popup to see contribution insights, streaks, and language stats.</p>` +
     `</div>`;
@@ -201,7 +201,7 @@ export function showLoadingSkeleton() {
   const skeleton = el("div", "gpi-panel gpi-skeleton");
   skeleton.id = "gpi-panel";
   skeleton.innerHTML =
-    `<div class="gpi-header"><span class="gpi-title">Profile Insights</span><span class="gpi-badge">Loading...</span></div>` +
+    `<div class="gpi-header"><span class="gpi-title">GitScope</span><span class="gpi-badge">Loading...</span></div>` +
     `<div class="gpi-stats-grid">` +
     Array(6).fill('<div class="gpi-stat-card"><div class="gpi-skeleton-line gpi-skeleton-value"></div><div class="gpi-skeleton-line gpi-skeleton-label"></div></div>').join("") +
     `</div>` +

@@ -1,7 +1,7 @@
-# Profile Insights for GitHub
+# GitScope
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://github.com/Sagargupta16/github-profile-insights)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://github.com/Sagargupta16/gitscope)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](src/manifest.json)
 
 > Browser extension that adds contribution insights to any GitHub profile - streaks, language breakdown, PR stats, activity heatmap, and more.
@@ -27,8 +27,8 @@
 
 1. Clone and build:
    ```bash
-   git clone https://github.com/Sagargupta16/github-profile-insights.git
-   cd github-profile-insights
+   git clone https://github.com/Sagargupta16/gitscope.git
+   cd gitscope
    npm install
    npm run build
    ```
@@ -63,7 +63,7 @@ Injected into GitHub sidebar
 ## Project Structure
 
 ```
-github-profile-insights/
+gitscope/
   src/                       # Source code
     manifest.json            # Extension manifest (Manifest V3)
     css/insights.css         # Dashboard styles (GitHub theme-aware)

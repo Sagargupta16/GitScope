@@ -1,5 +1,5 @@
 {
-  "name": "github-profile-insights",
+  "name": "gitscope",
   "version": "1.0.0",
   "private": true,
   "description": "Browser extension that adds contribution insights to any GitHub profile",
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Sagargupta16/github-profile-insights.git"
+    "url": "git+https://github.com/Sagargupta16/gitscope.git"
   },
   "author": "Sagar Gupta",
   "license": "MIT",

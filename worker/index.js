@@ -1,4 +1,4 @@
-// Cloudflare Worker - GitHub OAuth token exchange for Profile Insights extension
+// Cloudflare Worker - GitHub OAuth token exchange for GitScope extension
 
 export default {
   async fetch(request, env) {
@@ -52,7 +52,7 @@ function renderPage(title, message, status, token) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Profile Insights - ${title}</title>
+  <title>GitScope - ${title}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f6f8fa; color: #24292f; }
     .card { text-align: center; padding: 40px; background: #fff; border-radius: 12px; border: 1px solid #d0d7de; max-width: 400px; }

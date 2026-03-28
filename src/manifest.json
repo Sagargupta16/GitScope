@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Profile Insights for GitHub",
+  "name": "GitScope",
   "version": "1.0.0",
   "description": "Adds contribution insights dashboard to any GitHub profile - streaks, language breakdown, PR stats, and activity heatmap.",
   "permissions": [

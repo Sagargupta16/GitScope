@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Profile Insights for GitHub** - Chrome Extension
+**GitScope** - Chrome Extension
 
 Last updated: March 28, 2026
 
@@ -64,9 +64,9 @@ To remove all data stored by this extension:
 ## Open Source
 
 This extension is fully open source. You can audit the complete source code at:
-https://github.com/Sagargupta16/github-profile-insights
+https://github.com/Sagargupta16/gitscope
 
 ## Contact
 
 For privacy questions or concerns, open an issue at:
-https://github.com/Sagargupta16/github-profile-insights/issues
+https://github.com/Sagargupta16/gitscope/issues
