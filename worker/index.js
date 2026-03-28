@@ -33,12 +33,11 @@ export default {
       const tokenData = await tokenResponse.json();
 
       if (tokenData.error) {
-        return new Response(renderPage("Authorization failed", "Please close this tab and try again.", "error"), {
+        return new Response(renderPage("Authorization failed", "Please close this tab and try again.", "error", null), {
           headers: { "Content-Type": "text/html" }
         });
       }
 
-      // Return the token to the extension via postMessage
       return new Response(renderPage("Authorization successful", "You can close this tab now.", "success", tokenData.access_token), {
         headers: { "Content-Type": "text/html" }
       });
@@ -69,8 +68,16 @@ function renderPage(title, message, status, token) {
     <p>${message}</p>
   </div>
   ${token ? `<script>
-    // Send token back to the extension
-    window.postMessage({ type: "GPI_AUTH_TOKEN", token: "${token}" }, "*");
+    // Store token in localStorage so the extension content script can read it
+    document.body.setAttribute("data-gpi-token", "${token}");
+    // Also try opener (if popup was opened via window.open)
+    try {
+      if (window.opener) {
+        window.opener.postMessage({ type: "GPI_AUTH_TOKEN", token: "${token}" }, "*");
+      }
+    } catch(e) {}
+    // Auto-close after brief delay
+    setTimeout(function() { window.close(); }, 2000);
   </script>` : ""}
 </body>
 </html>`;

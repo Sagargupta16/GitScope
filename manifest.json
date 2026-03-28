@@ -23,6 +23,15 @@
         "js/main.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://gpi-auth.sg85207.workers.dev/*"
+      ],
+      "js": [
+        "js/auth-callback.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "action": {
