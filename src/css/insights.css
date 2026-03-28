@@ -1,0 +1,207 @@
+/* GitHub Profile Insights - Dashboard Styles */
+/* Uses GitHub CSS custom properties for automatic light/dark theme support */
+
+.gpi-container {
+  margin-top: 16px;
+  animation: gpi-fadeIn 0.3s ease;
+}
+
+@keyframes gpi-fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.gpi-panel {
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-radius: 6px;
+  background: var(--bgColor-default, #ffffff);
+  overflow: hidden;
+}
+
+.gpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+  background: var(--bgColor-muted, #f6f8fa);
+}
+
+.gpi-title { font-size: 14px; font-weight: 600; color: var(--fgColor-default, #24292f); }
+.gpi-badge { font-size: 10px; color: var(--fgColor-muted, #656d76); }
+
+/* Stats Grid */
+.gpi-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--borderColor-default, #d0d7de);
+  border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+}
+
+.gpi-stat-card {
+  background: var(--bgColor-default, #ffffff);
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.gpi-stat-value { font-size: 18px; font-weight: 700; color: var(--fgColor-default, #24292f); line-height: 1.2; }
+.gpi-stat-label { font-size: 11px; color: var(--fgColor-muted, #656d76); margin-top: 2px; }
+
+/* Sections */
+.gpi-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+}
+
+.gpi-section:last-child { border-bottom: none; }
+
+.gpi-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fgColor-muted, #656d76);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.gpi-section-hint {
+  text-transform: none;
+  font-weight: 400;
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+/* Language Bar */
+.gpi-lang-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.gpi-lang-segment { min-width: 3px; transition: width 0.3s ease; }
+.gpi-lang-segment:first-child { border-radius: 4px 0 0 4px; }
+.gpi-lang-segment:last-child { border-radius: 0 4px 4px 0; }
+.gpi-lang-legend { display: flex; flex-wrap: wrap; gap: 8px; }
+.gpi-lang-item { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--fgColor-muted, #656d76); }
+.gpi-lang-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.gpi-lang-name { color: var(--fgColor-default, #24292f); }
+.gpi-lang-pct { color: var(--fgColor-muted, #656d76); }
+
+/* Top Repositories */
+.gpi-repo-list { display: flex; flex-direction: column; gap: 6px; }
+
+.gpi-repo-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+
+.gpi-repo-name {
+  color: var(--fgColor-accent, #0969da);
+  text-decoration: none;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.gpi-repo-name:hover { text-decoration: underline; }
+
+.gpi-repo-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fgColor-muted, #656d76);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* Mini Heatmap */
+.gpi-heatmap { display: flex; gap: 2px; overflow: hidden; }
+.gpi-heatmap-col { display: flex; flex-direction: column; gap: 2px; }
+
+.gpi-heatmap-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.gpi-heatmap-cell[data-level="0"] { background: var(--bgColor-neutral-muted, #ebedf0); }
+.gpi-heatmap-cell[data-level="1"] { background: #9be9a8; }
+.gpi-heatmap-cell[data-level="2"] { background: #40c463; }
+.gpi-heatmap-cell[data-level="3"] { background: #30a14e; }
+.gpi-heatmap-cell[data-level="4"] { background: #216e39; }
+
+/* Contribution Donut */
+.gpi-contrib-section { padding: 12px 16px; }
+.gpi-contrib-content { display: flex; align-items: center; gap: 16px; }
+.gpi-donut { width: 64px; height: 64px; flex-shrink: 0; }
+.gpi-contrib-stats { display: flex; flex-direction: column; gap: 4px; }
+
+.gpi-contrib-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fgColor-default, #24292f);
+}
+
+.gpi-pr-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+/* Weekday Chart */
+.gpi-weekday-chart { display: flex; gap: 4px; align-items: flex-end; height: 50px; }
+
+.gpi-weekday-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.gpi-weekday-bar {
+  width: 100%;
+  background: #40c463;
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s ease;
+}
+
+.gpi-weekday-label { font-size: 9px; color: var(--fgColor-muted, #656d76); margin-top: 4px; }
+
+/* Footer stats */
+.gpi-footer-stats {
+  font-size: 11px;
+  color: var(--fgColor-muted, #656d76);
+  text-align: center;
+  padding: 10px 16px;
+  line-height: 1.6;
+}
+
+/* Token Prompt */
+.gpi-prompt-text { font-size: 13px; color: var(--fgColor-default, #24292f); margin: 0; line-height: 1.5; }
+
+/* Loading Skeleton */
+.gpi-skeleton-line {
+  background: linear-gradient(90deg,
+    var(--bgColor-neutral-muted, #ebedf0) 25%,
+    var(--bgColor-muted, #f6f8fa) 50%,
+    var(--bgColor-neutral-muted, #ebedf0) 75%
+  );
+  background-size: 200% 100%;
+  animation: gpi-shimmer 1.5s ease infinite;
+  border-radius: 3px;
+}
+
+.gpi-skeleton-value { width: 40px; height: 20px; margin: 0 auto 4px; }
+.gpi-skeleton-label { width: 55px; height: 12px; margin: 0 auto; }
+
+@keyframes gpi-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Dark theme */
+@media (prefers-color-scheme: dark) {
+  .gpi-heatmap-cell[data-level="0"] { background: #161b22; }
+  .gpi-heatmap-cell[data-level="1"] { background: #0e4429; }
+  .gpi-heatmap-cell[data-level="2"] { background: #006d32; }
+  .gpi-heatmap-cell[data-level="3"] { background: #26a641; }
+  .gpi-heatmap-cell[data-level="4"] { background: #39d353; }
+  .gpi-weekday-bar { background: #26a641; }
+}

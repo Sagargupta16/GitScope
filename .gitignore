@@ -1,7 +1,7 @@
 # Dependencies
 node_modules/
 
-# Build artifacts
+# Build output (regenerated via npm run build)
 dist/
 *.zip
 *.crx

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "GitHub Profile Insights",
+  "name": "Profile Insights for GitHub",
   "version": "1.0.0",
   "description": "Adds contribution insights dashboard to any GitHub profile - streaks, language breakdown, PR stats, and activity heatmap.",
   "permissions": [
@@ -8,29 +8,14 @@
   ],
   "content_scripts": [
     {
-      "matches": [
-        "*://github.com/*"
-      ],
-      "css": [
-        "css/insights.css"
-      ],
-      "js": [
-        "js/utils.js",
-        "js/auth.js",
-        "js/api.js",
-        "js/charts.js",
-        "js/dashboard.js",
-        "js/main.js"
-      ],
+      "matches": ["*://github.com/*"],
+      "css": ["css/insights.css"],
+      "js": ["js/content.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": [
-        "*://gpi-auth.sg85207.workers.dev/*"
-      ],
-      "js": [
-        "js/auth-callback.js"
-      ],
+      "matches": ["*://gpi-auth.sg85207.workers.dev/*"],
+      "js": ["js/auth-callback.js"],
       "run_at": "document_idle"
     }
   ],
