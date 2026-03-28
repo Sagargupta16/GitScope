@@ -1,0 +1,7 @@
+name = "gpi-auth"
+main = "index.js"
+compatibility_date = "2026-03-28"
+
+[vars]
+CLIENT_ID = "Ov23lijiO0uq76vl8Rp6"
+REDIRECT_URI = "https://gpi-auth.sg85207.workers.dev/callback"

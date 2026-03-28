@@ -1,59 +1,29 @@
-// GitHub OAuth Device Flow authentication
-// No backend needed - works entirely client-side
+// GitHub OAuth authentication via Cloudflare Worker
 
-var GPI_CLIENT_ID = "Ov23lijiO0uq76vl8Rp6";
-var GPI_SCOPE = "read:user";
+var GPI_AUTH_URL = "https://gpi-auth.sg85207.workers.dev/login";
+var GPI_CALLBACK_URL = "https://gpi-auth.sg85207.workers.dev/callback";
 
-// Step 1: Request device and user codes from GitHub
-async function requestDeviceCode() {
-  var response = await fetch("https://github.com/login/device/code", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json"
-    },
-    body: JSON.stringify({
-      client_id: GPI_CLIENT_ID,
-      scope: GPI_SCOPE
-    })
-  });
-  if (!response.ok) return null;
-  return await response.json();
-}
-
-// Step 2: Poll GitHub until user completes authorization
-async function pollForToken(deviceCode, interval) {
+// Open GitHub OAuth page in a popup window
+function startOAuth() {
   return new Promise(function (resolve) {
-    var pollInterval = setInterval(async function () {
-      var response = await fetch("https://github.com/login/oauth/access_token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          client_id: GPI_CLIENT_ID,
-          device_code: deviceCode,
-          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-        })
-      });
+    var popup = window.open(GPI_AUTH_URL, "gpi_auth", "width=600,height=700");
 
-      var data = await response.json();
+    // Listen for token from callback page
+    window.addEventListener("message", function handler(event) {
+      if (event.origin === "https://gpi-auth.sg85207.workers.dev" && event.data && event.data.type === "GPI_AUTH_TOKEN") {
+        window.removeEventListener("message", handler);
+        if (popup) popup.close();
+        resolve(event.data.token);
+      }
+    });
 
-      if (data.access_token) {
-        clearInterval(pollInterval);
-        resolve(data.access_token);
-      } else if (data.error === "expired_token") {
-        clearInterval(pollInterval);
+    // Check if popup was closed without completing
+    var checkClosed = setInterval(function () {
+      if (popup && popup.closed) {
+        clearInterval(checkClosed);
         resolve(null);
       }
-      // "authorization_pending" and "slow_down" - keep polling
-      if (data.error === "slow_down") {
-        clearInterval(pollInterval);
-        interval += 5;
-        pollInterval = setInterval(arguments.callee, interval * 1000);
-      }
-    }, interval * 1000);
+    }, 1000);
   });
 }
 
