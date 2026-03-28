@@ -27,4 +27,4 @@ Thanks for your interest in contributing!
 
 ## Reporting Issues
 
-Use the [issue tracker](https://github.com/Sagargupta16/gitscope/issues) to report bugs or request features.
+Use the [issue tracker](https://github.com/Sagargupta16/GitScope/issues) to report bugs or request features.

@@ -30,4 +30,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Privacy policy (PRIVACY.md)
 - Manifest V3
 
-[1.0.0]: https://github.com/Sagargupta16/gitscope/releases/tag/v1.0.0
+[1.0.0]: https://github.com/Sagargupta16/GitScope/releases/tag/v1.0.0

@@ -64,9 +64,9 @@ To remove all data stored by this extension:
 ## Open Source
 
 This extension is fully open source. You can audit the complete source code at:
-https://github.com/Sagargupta16/gitscope
+https://github.com/Sagargupta16/GitScope
 
 ## Contact
 
 For privacy questions or concerns, open an issue at:
-https://github.com/Sagargupta16/gitscope/issues
+https://github.com/Sagargupta16/GitScope/issues
