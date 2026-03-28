@@ -6,7 +6,7 @@ export default {
 
     // Step 1: Redirect user to GitHub OAuth
     if (url.pathname === "/login") {
-      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user`;
+      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user%20read:org%20repo`;
       return Response.redirect(githubUrl, 302);
     }
 

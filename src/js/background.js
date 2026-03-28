@@ -13,8 +13,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.errors) {
-          console.error("[GPI] GraphQL errors:", data.errors);
-          sendResponse(null);
+          console.error("[GPI] GraphQL errors:", JSON.stringify(data.errors, null, 2));
+          // Still return partial data if available
+          sendResponse(data?.data || null);
         } else {
           sendResponse(data?.data || null);
         }
