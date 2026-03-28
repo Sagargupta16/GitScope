@@ -1,7 +1,7 @@
 # GitScope
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/fndaanihifimmlnmkjdmjbbkbdajolff?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/gitscope/fndaanihifimmlnmkjdmjbbkbdajolff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://github.com/Sagargupta16/GitScope)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](src/manifest.json)
 
 > Browser extension that adds contribution insights to any GitHub profile - streaks, language breakdown, PR stats, activity heatmap, and more.
@@ -22,6 +22,10 @@
 - **Privacy First** - OAuth token stored locally, secrets server-side
 
 ## Installation
+
+### Chrome Web Store (Recommended)
+
+Install directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/gitscope/fndaanihifimmlnmkjdmjbbkbdajolff).
 
 ### Chrome (Developer Mode)
 
