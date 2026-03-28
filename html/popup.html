@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GitHub Profile Insights</title>
+  <title>Profile Insights for GitHub</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -16,64 +16,114 @@
       border-bottom: 1px solid #d0d7de;
       background: #f6f8fa;
     }
-    .header h1 {
-      font-size: 16px;
-      font-weight: 600;
-    }
-    .header p {
-      font-size: 12px;
-      color: #656d76;
-      margin-top: 4px;
-    }
-    .section {
-      padding: 16px;
-    }
-    .section label {
+    .header h1 { font-size: 16px; font-weight: 600; }
+    .header p { font-size: 12px; color: #656d76; margin-top: 4px; }
+    .section { padding: 16px; }
+
+    /* Sign in state */
+    .btn-signin {
       display: block;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .section p.hint {
-      font-size: 11px;
-      color: #656d76;
-      margin-bottom: 8px;
-      line-height: 1.4;
-    }
-    input[type="text"] {
       width: 100%;
-      padding: 6px 10px;
+      padding: 10px;
       border: 1px solid #d0d7de;
       border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #24292f;
+      color: #fff;
+      text-align: center;
+    }
+    .btn-signin:hover { background: #32383f; }
+    .btn-signin svg { vertical-align: middle; margin-right: 8px; }
+
+    /* Device code state */
+    .device-flow { display: none; text-align: center; }
+    .device-code {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: monospace;
+      letter-spacing: 4px;
+      padding: 16px;
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      margin: 12px 0;
+    }
+    .device-instructions {
       font-size: 13px;
-      background: #fff;
+      color: #656d76;
+      line-height: 1.5;
+      margin-bottom: 12px;
     }
-    input[type="text"]:focus {
-      outline: none;
-      border-color: #0969da;
-      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+    .device-link {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #238636;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
     }
-    .btn {
+    .device-link:hover { background: #2ea043; }
+    .device-status {
+      font-size: 12px;
+      color: #656d76;
+      margin-top: 8px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #d0d7de;
+      border-top-color: #0969da;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Signed in state */
+    .signed-in { display: none; }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+    .user-name { font-size: 14px; font-weight: 600; }
+    .user-login { font-size: 12px; color: #656d76; }
+    .btn-signout {
       display: block;
       width: 100%;
       padding: 8px;
-      margin-top: 10px;
-      border: none;
+      border: 1px solid #d0d7de;
       border-radius: 6px;
       font-size: 13px;
-      font-weight: 600;
       cursor: pointer;
-      background: #238636;
-      color: #fff;
+      background: #fff;
+      color: #cf222e;
     }
-    .btn:hover { background: #2ea043; }
-    .status {
+    .btn-signout:hover { background: #ffebe9; }
+    .status-text {
       font-size: 12px;
-      margin-top: 8px;
+      color: #1a7f37;
       text-align: center;
+      margin-bottom: 8px;
     }
-    .status.success { color: #1a7f37; }
-    .status.error { color: #cf222e; }
+
     .footer {
       padding: 12px 16px;
       border-top: 1px solid #d0d7de;
@@ -82,32 +132,41 @@
       text-align: center;
     }
     .footer a { color: #0969da; text-decoration: none; }
-    .footer a:hover { text-decoration: underline; }
-    .token-info {
-      padding: 12px 16px;
-      border-bottom: 1px solid #d0d7de;
-      font-size: 12px;
-      background: #ddf4ff;
-      color: #0969da;
-    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>GitHub Profile Insights</h1>
+    <h1>Profile Insights for GitHub</h1>
     <p>View contribution stats on any GitHub profile</p>
   </div>
 
-  <div class="section">
-    <label for="tokenInput">GitHub Personal Access Token</label>
-    <p class="hint">
-      Create a token at
-      <a href="https://github.com/settings/tokens/new" target="_blank">github.com/settings/tokens</a>
-      with <strong>read:user</strong> scope. Your token is stored locally and never sent anywhere except GitHub's API.
-    </p>
-    <input type="text" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
-    <button class="btn" id="saveBtn">Save Token</button>
-    <div class="status" id="status"></div>
+  <!-- Not signed in -->
+  <div class="section" id="signInSection">
+    <button class="btn-signin" id="signInBtn">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      Sign in with GitHub
+    </button>
+  </div>
+
+  <!-- Device flow in progress -->
+  <div class="section device-flow" id="deviceFlowSection">
+    <div class="device-instructions">Enter this code on GitHub:</div>
+    <div class="device-code" id="userCode">----</div>
+    <a class="device-link" id="verifyLink" href="https://github.com/login/device" target="_blank">Open GitHub</a>
+    <div class="device-status"><span class="spinner"></span>Waiting for authorization...</div>
+  </div>
+
+  <!-- Signed in -->
+  <div class="section signed-in" id="signedInSection">
+    <div class="status-text">Connected to GitHub</div>
+    <div class="user-info">
+      <img class="user-avatar" id="userAvatar" src="" alt="" />
+      <div>
+        <div class="user-name" id="userName"></div>
+        <div class="user-login" id="userLogin"></div>
+      </div>
+    </div>
+    <button class="btn-signout" id="signOutBtn">Sign Out</button>
   </div>
 
   <div class="footer">
@@ -115,6 +174,7 @@
     &middot; v1.0.0
   </div>
 
+  <script src="../js/auth.js"></script>
   <script src="../js/popup-script.js"></script>
 </body>
 </html>

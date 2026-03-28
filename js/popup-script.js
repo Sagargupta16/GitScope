@@ -1,53 +1,73 @@
-// Popup script - manages token storage
+// Popup script - manages OAuth Device Flow authentication
 
-document.addEventListener("DOMContentLoaded", function () {
-  var tokenInput = document.getElementById("tokenInput");
-  var saveBtn = document.getElementById("saveBtn");
-  var status = document.getElementById("status");
+document.addEventListener("DOMContentLoaded", async function () {
+  var signInSection = document.getElementById("signInSection");
+  var deviceFlowSection = document.getElementById("deviceFlowSection");
+  var signedInSection = document.getElementById("signedInSection");
 
-  // Load existing token
-  chrome.storage.sync.get(["ghToken"], function (result) {
-    if (result.ghToken) {
-      tokenInput.value = result.ghToken.substring(0, 8) + "...";
-      tokenInput.setAttribute("data-has-token", "true");
-    }
-  });
+  // Check if already signed in
+  var token = await getSavedToken();
+  if (token) {
+    await showSignedIn(token);
+  }
 
-  // Clear placeholder on focus
-  tokenInput.addEventListener("focus", function () {
-    if (tokenInput.getAttribute("data-has-token") === "true") {
-      tokenInput.value = "";
-      tokenInput.removeAttribute("data-has-token");
-    }
-  });
+  // Sign in button
+  document.getElementById("signInBtn").addEventListener("click", async function () {
+    signInSection.style.display = "none";
+    deviceFlowSection.style.display = "block";
 
-  // Save token
-  saveBtn.addEventListener("click", function () {
-    var token = tokenInput.value.trim();
-    if (!token || token.includes("...")) {
-      status.textContent = "Enter a valid token";
-      status.className = "status error";
+    // Request device code
+    var deviceData = await requestDeviceCode();
+    if (!deviceData || !deviceData.user_code) {
+      signInSection.style.display = "block";
+      deviceFlowSection.style.display = "none";
       return;
     }
 
-    // Validate token with a test request
-    fetch("https://api.github.com/user", {
-      headers: { "Authorization": "Bearer " + token }
-    }).then(function (response) {
-      if (response.ok) {
-        chrome.storage.sync.set({ ghToken: token }, function () {
-          status.textContent = "Token saved. Reload any GitHub profile to see insights.";
-          status.className = "status success";
-          tokenInput.value = token.substring(0, 8) + "...";
-          tokenInput.setAttribute("data-has-token", "true");
-        });
-      } else {
-        status.textContent = "Invalid token. Check permissions and try again.";
-        status.className = "status error";
-      }
-    }).catch(function () {
-      status.textContent = "Network error. Try again.";
-      status.className = "status error";
-    });
+    // Show code to user
+    document.getElementById("userCode").textContent = deviceData.user_code;
+
+    // Poll for token
+    var token = await pollForToken(deviceData.device_code, deviceData.interval || 5);
+
+    if (token) {
+      await saveToken(token);
+      deviceFlowSection.style.display = "none";
+      await showSignedIn(token);
+    } else {
+      // Expired or failed
+      deviceFlowSection.style.display = "none";
+      signInSection.style.display = "block";
+    }
   });
+
+  // Sign out button
+  document.getElementById("signOutBtn").addEventListener("click", async function () {
+    await clearSavedToken();
+    signedInSection.style.display = "none";
+    signInSection.style.display = "block";
+  });
+
+  async function showSignedIn(token) {
+    // Fetch user info
+    var response = await fetch("https://api.github.com/user", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+
+    if (!response.ok) {
+      // Token invalid - clear and show sign in
+      await clearSavedToken();
+      signInSection.style.display = "block";
+      return;
+    }
+
+    var user = await response.json();
+    document.getElementById("userAvatar").src = user.avatar_url + "&s=80";
+    document.getElementById("userName").textContent = user.name || user.login;
+    document.getElementById("userLogin").textContent = "@" + user.login;
+
+    signInSection.style.display = "none";
+    deviceFlowSection.style.display = "none";
+    signedInSection.style.display = "block";
+  }
 });

@@ -16,6 +16,7 @@
       ],
       "js": [
         "js/utils.js",
+        "js/auth.js",
         "js/api.js",
         "js/charts.js",
         "js/dashboard.js",

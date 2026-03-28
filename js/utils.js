@@ -18,13 +18,6 @@ function getProfileUsername() {
   return window.location.pathname.split("/").filter(Boolean)[0];
 }
 
-function getToken() {
-  return new Promise(function (resolve) {
-    chrome.storage.sync.get(["ghToken"], function (result) {
-      resolve(result.ghToken || null);
-    });
-  });
-}
 
 function formatNumber(num) {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";

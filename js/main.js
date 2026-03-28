@@ -9,7 +9,7 @@
   var username = getProfileUsername();
   if (!username) return;
 
-  var token = await getToken();
+  var token = await getSavedToken();
   if (!token) {
     showTokenPrompt();
     return;
