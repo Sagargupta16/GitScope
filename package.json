@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build.js",
     "watch": "node build.js --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "version": "node scripts/bump-version.js && git add src/manifest.json"
   },
   "repository": {
     "type": "git",
