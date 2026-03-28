@@ -6,6 +6,16 @@
 
 > Browser extension that adds contribution insights to any GitHub profile - streaks, language breakdown, PR stats, activity heatmap, and more.
 
+## Screenshots
+
+<p align="center">
+  <img src="images/gitscope-dark-top.jpg" alt="GitScope - Stats grid, language breakdown, top repos, and activity heatmap" width="700">
+</p>
+
+<p align="center">
+  <img src="images/gitscope-dark-bottom.jpg" alt="GitScope - Contribution donut, activity by day, and footer stats" width="700">
+</p>
+
 ## Features
 
 - **Stats Grid** - Total stars, yearly contributions, current/longest streak, merged PRs, repository count
