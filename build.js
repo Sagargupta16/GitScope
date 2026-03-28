@@ -34,6 +34,7 @@ const entryPoints = {
   "js/content": "src/js/content.js",
   "js/auth-callback": "src/js/auth-callback.js",
   "js/popup": "src/js/popup.js",
+  "js/background": "src/js/background.js",
 };
 
 const buildOptions = {

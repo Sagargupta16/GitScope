@@ -152,9 +152,6 @@ export function buildInsightsPanel(data) {
     const bDate = new Date(streaks.busiestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
     footerStats.push(`Busiest day: <strong>${bDate}</strong> (${streaks.busiestDay.contributionCount})`);
   }
-  if (user.repositoryDiscussionComments?.totalCount > 0) {
-    footerStats.push(`Discussion answers: <strong>${user.repositoryDiscussionComments.totalCount}</strong>`);
-  }
   if (user.starredRepositories?.totalCount > 0) {
     footerStats.push(`Starred repos: <strong>${formatNumber(user.starredRepositories.totalCount)}</strong>`);
   }

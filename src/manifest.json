@@ -6,6 +6,12 @@
   "permissions": [
     "storage"
   ],
+  "host_permissions": [
+    "https://api.github.com/*"
+  ],
+  "background": {
+    "service_worker": "js/background.js"
+  },
   "content_scripts": [
     {
       "matches": ["*://github.com/*"],

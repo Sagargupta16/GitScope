@@ -1,8 +1,6 @@
-// GitHub GraphQL API - parameterized queries (no string injection)
+// GitHub GraphQL API - parameterized queries via background service worker
 
 import { getCached, setCache } from "./storage.js";
-
-const GITHUB_GRAPHQL = "https://api.github.com/graphql";
 
 const PROFILE_QUERY = `
   query ProfileInsights($username: String!) {
@@ -35,7 +33,6 @@ const PROFILE_QUERY = `
       openPRs: pullRequests(states: OPEN, first: 1) { totalCount }
       closedPRs: pullRequests(states: CLOSED, first: 1) { totalCount }
       issues(first: 1) { totalCount }
-      repositoryDiscussionComments(onlyAnswers: true, first: 1) { totalCount }
       contributionsCollection {
         totalCommitContributions
         totalPullRequestContributions
@@ -57,28 +54,15 @@ const PROFILE_QUERY = `
   }
 `;
 
-async function graphqlQuery(query, variables, token) {
-  const response = await fetch(GITHUB_GRAPHQL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
-    body: JSON.stringify({ query, variables })
+function sendMessage(message) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      resolve(response);
+    });
   });
-
-  if (!response.ok) return null;
-
-  const data = await response.json();
-  if (data.errors) {
-    console.error("[GPI] GraphQL errors:", data.errors);
-    return null;
-  }
-  return data.data;
 }
 
 export async function fetchProfileInsights(username, token) {
-  // Check cache first
   const cacheKey = `gpi_profile_${username}`;
   const cached = await getCached(cacheKey);
   if (cached) {
@@ -86,7 +70,13 @@ export async function fetchProfileInsights(username, token) {
     return cached;
   }
 
-  const data = await graphqlQuery(PROFILE_QUERY, { username }, token);
+  const data = await sendMessage({
+    type: "GPI_GRAPHQL",
+    token,
+    query: PROFILE_QUERY,
+    variables: { username }
+  });
+
   if (data) {
     await setCache(cacheKey, data);
   }
