@@ -1,21 +1,29 @@
-// Cloudflare Worker - GitHub OAuth token exchange for GitScope extension
+// Cloudflare Worker - GitHub OAuth token exchange for GitScope extension + website
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Step 1: Redirect user to GitHub OAuth
+    // Extension login: redirect to GitHub OAuth
     if (url.pathname === "/login") {
       const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user%20read:org`;
       return Response.redirect(githubUrl, 302);
     }
 
-    // Step 2: GitHub redirects back with a code - exchange it for a token
+    // Website login: redirect to GitHub OAuth with state=web to flag web flow
+    if (url.pathname === "/web/login") {
+      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user%20read:org&state=web`;
+      return Response.redirect(githubUrl, 302);
+    }
+
+    // Shared callback: handles both extension and web flows
     if (url.pathname === "/callback") {
       const code = url.searchParams.get("code");
       if (!code) {
         return new Response("Missing code parameter", { status: 400 });
       }
+
+      const isWebFlow = url.searchParams.get("state") === "web";
 
       const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
         method: "POST",
@@ -32,6 +40,16 @@ export default {
 
       const tokenData = await tokenResponse.json();
 
+      // Web flow: redirect back to website with token in hash
+      if (isWebFlow) {
+        const siteUrl = "https://sagargupta16.github.io/GitScope/leaderboard";
+        if (tokenData.error) {
+          return Response.redirect(`${siteUrl}#error=auth_failed`, 302);
+        }
+        return Response.redirect(`${siteUrl}#token=${tokenData.access_token}`, 302);
+      }
+
+      // Extension flow: render page with postMessage
       if (tokenData.error) {
         return new Response(renderPage("Authorization failed", "Please close this tab and try again.", "error", null), {
           headers: { "Content-Type": "text/html" }
@@ -41,41 +59,6 @@ export default {
       return new Response(renderPage("Authorization successful", "You can close this tab now.", "success", tokenData.access_token), {
         headers: { "Content-Type": "text/html" }
       });
-    }
-
-    // Web OAuth: redirect to GitHub with website callback
-    if (url.pathname === "/web/login") {
-      const redirectUri = `${url.origin}/web/callback`;
-      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20read:org`;
-      return Response.redirect(githubUrl, 302);
-    }
-
-    // Web OAuth: exchange code and redirect to website with token in hash
-    if (url.pathname === "/web/callback") {
-      const code = url.searchParams.get("code");
-      if (!code) {
-        return new Response("Missing code parameter", { status: 400 });
-      }
-
-      const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({
-          client_id: env.CLIENT_ID,
-          client_secret: env.CLIENT_SECRET,
-          code: code,
-          redirect_uri: `${url.origin}/web/callback`
-        })
-      });
-
-      const tokenData = await tokenResponse.json();
-      const siteUrl = "https://sagargupta16.github.io/GitScope/leaderboard";
-
-      if (tokenData.error) {
-        return Response.redirect(`${siteUrl}#error=auth_failed`, 302);
-      }
-
-      return Response.redirect(`${siteUrl}#token=${tokenData.access_token}`, 302);
     }
 
     return new Response("Not found", { status: 404 });

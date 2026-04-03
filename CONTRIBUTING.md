@@ -5,25 +5,58 @@ Thanks for your interest in contributing!
 ## Getting Started
 
 1. Fork and clone the repo
-2. Load the extension in Chrome:
+2. Install dependencies and build:
+   ```bash
+   # Extension
+   npm install
+   npm run build
+
+   # Website
+   cd website
+   pnpm install
+   pnpm dev
+   ```
+3. Load the extension in Chrome:
    - Go to `chrome://extensions`
    - Enable "Developer mode"
-   - Click "Load unpacked" and select the project folder
-3. Visit any GitHub profile to see the extension in action
+   - Click "Load unpacked" and select the `dist/` folder
+4. Visit any GitHub profile to see the extension in action
+
+## Project Structure
+
+- `src/` - Chrome extension (vanilla JS, esbuild)
+- `website/` - Landing page + web tools (React 19, TypeScript, Vite, Tailwind CSS v4)
+- `worker/` - Cloudflare Worker for OAuth (JS)
+- `docs/` - Built website output (auto-generated, do not edit directly)
 
 ## Development
 
-- No build step required - edit files and reload the extension
+### Extension
+
+- Edit files in `src/` and run `npm run build` (or `npm run watch` for auto-rebuild)
 - CSS uses GitHub's CSS custom properties for theme compatibility
-- All API calls go through `js/api.js`
-- Charts are pure CSS/SVG (no external libraries)
+- All API calls go through `src/js/api.js` via the background service worker
+- Charts are pure CSS/SVG in `src/js/charts.js` (no external charting libraries)
+
+### Website
+
+- Run `cd website && pnpm dev` for hot-reload dev server
+- Pages are in `website/src/pages/`
+- GitHub API logic is in `website/src/lib/github.ts`
+- Analytics functions (ported from extension) are in `website/src/lib/analytics.ts`
+
+### Worker
+
+- Run `cd worker && npx wrangler dev` for local testing
+- Handles both extension and website OAuth flows via the `state` parameter
 
 ## Pull Requests
 
 - Link your PR to an existing issue if applicable
 - Test on both light and dark GitHub themes
 - Keep changes focused - one feature per PR
-- Match the existing code style (vanilla JS, `var`, no frameworks)
+- Follow existing code style (vanilla JS for extension, TypeScript for website)
+- Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
 
 ## Reporting Issues
 

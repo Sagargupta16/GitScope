@@ -3,8 +3,9 @@
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/fndaanihifimmlnmkjdmjbbkbdajolff?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/gitscope/fndaanihifimmlnmkjdmjbbkbdajolff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](src/manifest.json)
+[![Website](https://img.shields.io/badge/Website-GitScope-blue)](https://sagargupta16.github.io/GitScope/)
 
-> Browser extension that adds contribution insights to any GitHub profile - streaks, language breakdown, PR stats, activity heatmap, and more.
+> Browser extension + web tools for GitHub profile insights - contribution streaks, language breakdown, PR stats, profile comparison, and leaderboards.
 
 ## Screenshots
 
@@ -18,6 +19,8 @@
 
 ## Features
 
+### Chrome Extension
+
 - **Stats Grid** - Total stars, yearly contributions, current/longest streak, merged PRs, repository count
 - **Coding Personality** - Badge like "Builder", "Reviewer", or "Collaborator" based on contribution mix
 - **Quick Insights** - Avg contributions per active day, velocity trend, own/fork ratio
@@ -27,14 +30,15 @@
 - **Contribution Donut** - Commits, PRs, reviews, and issues breakdown chart
 - **Activity by Day** - Bar chart showing which day of the week you're most active
 - **Repo Growth Timeline** - Bar chart showing repository creation history by year
-- **Profile Comparison** - Compare any profile against your own stats (contributions, stars, repos, PRs)
-- **Footer Stats** - Busiest day of the year, starred repos count
-- **Error State** - Friendly error message with retry button
-- **Loading Skeleton** - Shimmer animation while data loads
+- **Profile Comparison** - Compare any profile against your own stats
 - **Dark Theme** - Automatically adapts to GitHub's light/dark theme
-- **SPA Navigation** - Works across GitHub page transitions (turbo:load)
 - **Caching** - 5-minute TTL to avoid redundant API calls
-- **Privacy First** - OAuth token stored locally, secrets server-side
+
+### Website ([sagargupta16.github.io/GitScope](https://sagargupta16.github.io/GitScope/))
+
+- **Compare Tool** - Side-by-side GitHub profile comparison with head-to-head scoring
+- **Leaderboard** - Rank yourself against everyone you follow (stars, repos, followers)
+- **Full Stats Mode** - Sign in for contributions, streaks, PRs, personality, and velocity
 
 ## Installation
 
@@ -47,7 +51,7 @@ Install directly from the [Chrome Web Store](https://chromewebstore.google.com/d
 1. Clone and build:
    ```bash
    git clone https://github.com/Sagargupta16/GitScope.git
-   cd gitscope
+   cd GitScope
    npm install
    npm run build
    ```
@@ -55,7 +59,6 @@ Install directly from the [Chrome Web Store](https://chromewebstore.google.com/d
 3. Enable **Developer mode** (top right)
 4. Click **Load unpacked** and select the `dist/` folder
 5. Click the extension icon and click **"Sign in with GitHub"**
-6. Authorize the app on GitHub - done!
 
 ## How It Works
 
@@ -82,8 +85,8 @@ Injected into GitHub sidebar
 ## Project Structure
 
 ```
-gitscope/
-  src/                       # Source code
+GitScope/
+  src/                       # Chrome extension source
     manifest.json            # Extension manifest (Manifest V3)
     css/insights.css         # Dashboard styles (GitHub theme-aware)
     html/popup.html          # Extension popup (OAuth sign in/out)
@@ -92,38 +95,56 @@ gitscope/
       content.js             # Entry point (profile detection, SPA nav)
       background.js          # Service worker (API calls, avoids CORS)
       api.js                 # GitHub GraphQL queries (parameterized)
-      charts.js              # Pure CSS/SVG chart rendering
+      charts.js              # Pure CSS/SVG chart rendering + analytics
       dashboard.js           # Panel construction and injection
       storage.js             # Chrome storage + caching helpers
       utils.js               # Utility functions
       popup.js               # Popup OAuth management
       auth-callback.js       # OAuth callback token capture
+  website/                   # Landing page + web tools (React + TS)
+    src/
+      pages/                 # Landing, Compare, Leaderboard, Privacy
+      components/            # Header, Footer
+      lib/                   # GitHub API, analytics, auth utilities
+    vite.config.ts           # Builds to docs/ for GitHub Pages
   worker/                    # Cloudflare Worker (OAuth token exchange)
-    index.js                 # Worker code
+    index.js                 # Handles extension + web OAuth flows
     wrangler.toml            # Wrangler config
-  build.js                   # esbuild bundler script
-  dist/                      # Built extension (load this in Chrome)
+  docs/                      # Built website (deployed to GitHub Pages)
+  build.js                   # esbuild bundler for extension
   package.json
 ```
 
 ## Tech Stack
 
+### Extension
+
 - **Manifest V3** - Latest Chrome extension API
-- **ES Modules** - Modern `import`/`export`, `const`/`let`, arrow functions
+- **Vanilla JS** - Zero runtime dependencies
 - **esbuild** - Fast bundler (src/ -> dist/ in <1s)
 - **GitHub GraphQL API** - Single query fetches all profile data
-- **Cloudflare Workers** - Serverless OAuth token exchange
-- **Zero runtime dependencies** - Pure vanilla JS, no frameworks
 - **CSS Custom Properties** - GitHub's theme variables for automatic light/dark
+
+### Website
+
+- **React 19** + **TypeScript** - Component-based UI
+- **Vite** - Build tool with HMR
+- **Tailwind CSS v4** - Utility-first styling
+- **React Router v7** - Client-side routing
+- **GitHub REST + GraphQL APIs** - Hybrid auth (basic stats without login, full stats with)
+
+### Infrastructure
+
+- **Cloudflare Workers** - Serverless OAuth token exchange
+- **GitHub Pages** - Static site hosting
+- **GitHub Actions** - CI/CD for extension releases + website deployment
 
 ## Privacy
 
-- Authentication via GitHub OAuth (standard OAuth 2.0 flow)
-- Token stored in `chrome.storage.sync` (local to your browser, syncs across Chrome instances)
-- Client secret stored server-side on Cloudflare Worker (not in extension code)
+- Token stored locally (Chrome storage for extension, localStorage for website)
+- Client secret stored server-side on Cloudflare Worker
 - API responses cached locally for 5 minutes
 - No analytics, no tracking, no telemetry
-- Only communicates with `api.github.com` and `gpi-auth.sg85207.workers.dev` (OAuth only)
 - Source code is fully open and auditable
 
 See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
@@ -131,12 +152,22 @@ See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 ## Development
 
 ```bash
-npm install          # Install esbuild
+# Extension
+npm install
 npm run build        # Build to dist/
-npm run watch        # Watch mode (rebuild on changes)
-```
+npm run watch        # Watch mode
 
-Load `dist/` as an unpacked extension in Chrome for testing.
+# Website
+cd website
+pnpm install
+pnpm dev             # Dev server at localhost:5173
+pnpm build           # Build to docs/
+
+# Worker
+cd worker
+npx wrangler dev     # Local dev server
+npx wrangler deploy  # Deploy to Cloudflare
+```
 
 ## Contributing
 
