@@ -295,6 +295,23 @@
 .gpi-diff-pos { color: #238636; }
 .gpi-diff-neg { color: #da3633; }
 
+/* Community & Impact */
+.gpi-community-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gpi-community-item {
+  font-size: 12px;
+  color: var(--fgColor-muted, #656d76);
+  line-height: 1.5;
+}
+
+.gpi-community-item strong {
+  color: var(--fgColor-default, #24292f);
+}
+
 /* Footer stats */
 .gpi-footer-stats {
   font-size: 11px;

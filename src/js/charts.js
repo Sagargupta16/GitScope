@@ -220,6 +220,28 @@ export function computeAvgPerDay(calendar) {
   return (total / activeDays).toFixed(1);
 }
 
+export function computeWeekendPct(calendar) {
+  const days = calendar.weeks.flatMap(w => w.contributionDays);
+  const total = days.reduce((s, d) => s + d.contributionCount, 0);
+  if (total === 0) return 0;
+  const weekend = days
+    .filter(d => d.weekday === 0 || d.weekday === 6)
+    .reduce((s, d) => s + d.contributionCount, 0);
+  return Math.round((weekend / total) * 100);
+}
+
+export function computePRMergeRate(merged, open, closed) {
+  const total = merged + open + closed;
+  if (total === 0) return 0;
+  return Math.round((merged / total) * 100);
+}
+
+export function computeIssueCloseRate(closed, open) {
+  const total = closed + open;
+  if (total === 0) return 0;
+  return Math.round((closed / total) * 100);
+}
+
 export function renderRepoTimeline(repos) {
   const yearCounts = {};
   for (const repo of repos) {

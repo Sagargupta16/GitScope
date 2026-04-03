@@ -84,6 +84,28 @@ export function computeAvgPerDay(calendar: Calendar): number {
   return Math.round((total / activeDays) * 10) / 10;
 }
 
+export function computeWeekendPct(calendar: Calendar): number {
+  const days = calendar.weeks.flatMap((w) => w.contributionDays);
+  const total = days.reduce((s, d) => s + d.contributionCount, 0);
+  if (total === 0) return 0;
+  const weekend = days
+    .filter((d) => d.weekday === 0 || d.weekday === 6)
+    .reduce((s, d) => s + d.contributionCount, 0);
+  return Math.round((weekend / total) * 100);
+}
+
+export function computePRMergeRate(merged: number, open: number, closed: number): number {
+  const total = merged + open + closed;
+  if (total === 0) return 0;
+  return Math.round((merged / total) * 100);
+}
+
+export function computeIssueCloseRate(closed: number, open: number): number {
+  const total = closed + open;
+  if (total === 0) return 0;
+  return Math.round((closed / total) * 100);
+}
+
 export function formatNumber(num: number): string {
   if (Math.abs(num) >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
   if (Math.abs(num) >= 1_000) return `${(num / 1_000).toFixed(1)}k`;

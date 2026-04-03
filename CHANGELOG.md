@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-03
+
+### Added
+
+#### Extension
+- **PR merge rate** in stats grid (merged / total PRs percentage)
+- **Forks received** stat showing total forks across all repos
+- **Issue close rate** (closed / total issues percentage)
+- **Weekend %** showing percentage of contributions on weekends
+- **Language count** showing number of unique languages
+- **Community & Impact** section: repos contributed to, organizations, follower ratio, account age
+- More comparison metrics: forks received, followers in profile vs. you section
+
+#### Website
+- **Compare page** expanded with 17 head-to-head stats when signed in:
+  - Forks received, languages, account age (always available)
+  - PR merge rate, issue close rate, weekend %, contributed to, organizations (with auth)
+- **Leaderboard** now shows 5 sortable columns: stars, repos, followers, forks, languages
+- **Leaderboard caching** in localStorage (10-min TTL) to avoid rate limits on revisit
+- **Batched API requests** in leaderboard (5 concurrent) for faster loading
+- Profile cards show quick stat pills: avg/day, weekend %, language count, org count
+
+### Changed
+
+- Extension stats grid expanded from 6 to 9 cards (3x3 layout)
+- Extension GraphQL query now fetches issue states, repos contributed to, and organizations
+- Compare page comparison table widened for longer stat labels
+- Leaderboard table has column headers and shows all stats per row
+- Leaderboard sign-out also clears cached data
+
 ## [1.2.0] - 2026-04-03
 
 ### Added
@@ -78,6 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Privacy policy (PRIVACY.md)
 - Manifest V3
 
+[1.3.0]: https://github.com/Sagargupta16/GitScope/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Sagargupta16/GitScope/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Sagargupta16/GitScope/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Sagargupta16/GitScope/releases/tag/v1.0.0

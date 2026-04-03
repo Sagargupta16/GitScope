@@ -1,5 +1,8 @@
 import type { GitHubUser, GitHubRepo, ProfileStats, FullProfileStats, Language } from "./types";
-import { computePersonality, computeVelocity, computeAvgPerDay, computeStreaks } from "./analytics";
+import {
+  computePersonality, computeVelocity, computeAvgPerDay, computeStreaks,
+  computeWeekendPct, computePRMergeRate, computeIssueCloseRate,
+} from "./analytics";
 
 const LANG_COLORS: Record<string, string> = {
   JavaScript: "#f1e05a", TypeScript: "#3178c6", Python: "#3572A5",
@@ -45,8 +48,17 @@ export async function fetchPublicProfile(username: string): Promise<ProfileStats
 
   const originalRepos = repos.filter((r) => !r.fork && !r.archived).length;
   const forkedRepos = repos.filter((r) => r.fork).length;
+  const totalForksReceived = repos.reduce((sum, r) => sum + r.forks_count, 0);
+  const languageCount = Object.keys(langMap).length;
+  const accountAge = new Date().getFullYear() - new Date(user.created_at).getFullYear();
+  const followerRatio = user.following > 0
+    ? (user.followers / user.following).toFixed(1)
+    : user.followers > 0 ? "\u221e" : "0";
 
-  return { user, repos, totalStars, topLanguages, originalRepos, forkedRepos };
+  return {
+    user, repos, totalStars, topLanguages, originalRepos, forkedRepos,
+    totalForksReceived, languageCount, accountAge, followerRatio,
+  };
 }
 
 // GraphQL API - requires auth token, returns full stats
@@ -65,6 +77,12 @@ const PROFILE_QUERY = `
         }
       }
       pullRequests(states: MERGED, first: 1) { totalCount }
+      openPRs: pullRequests(states: OPEN, first: 1) { totalCount }
+      closedPRs: pullRequests(states: CLOSED, first: 1) { totalCount }
+      closedIssues: issues(states: CLOSED, first: 1) { totalCount }
+      openIssues: issues(states: OPEN, first: 1) { totalCount }
+      repositoriesContributedTo(first: 1, contributionTypes: [COMMIT, PULL_REQUEST, ISSUE]) { totalCount }
+      organizations { totalCount }
       contributionsCollection {
         totalCommitContributions
         totalPullRequestContributions
@@ -125,6 +143,16 @@ export async function fetchFullProfile(username: string, token: string): Promise
   const repos = u.repositories.nodes;
   const originalRepos = repos.filter((r: { isFork: boolean; isArchived: boolean }) => !r.isFork && !r.isArchived).length;
   const forkedRepos = repos.filter((r: { isFork: boolean }) => r.isFork).length;
+  const totalForksReceived = repos.reduce(
+    (sum: number, r: { forkCount: number }) => sum + r.forkCount, 0,
+  );
+  const languageCount = Object.keys(langMap).length;
+  const accountAge = new Date().getFullYear() - new Date(u.createdAt).getFullYear();
+  const followers = u.followers.totalCount;
+  const following = u.following?.totalCount ?? 0;
+  const followerRatio = following > 0
+    ? (followers / following).toFixed(1)
+    : followers > 0 ? "\u221e" : "0";
 
   const streaks = computeStreaks(calendar);
   const personality = computePersonality(
@@ -135,6 +163,19 @@ export async function fetchFullProfile(username: string, token: string): Promise
   );
   const velocity = computeVelocity(calendar);
   const avgPerDay = computeAvgPerDay(calendar);
+  const weekendPct = computeWeekendPct(calendar);
+
+  const mergedPRs = u.pullRequests.totalCount;
+  const openPRs = u.openPRs?.totalCount ?? 0;
+  const closedPRs = u.closedPRs?.totalCount ?? 0;
+  const prMergeRate = computePRMergeRate(mergedPRs, openPRs, closedPRs);
+
+  const closedIssues = u.closedIssues?.totalCount ?? 0;
+  const openIssues = u.openIssues?.totalCount ?? 0;
+  const issueCloseRate = computeIssueCloseRate(closedIssues, openIssues);
+
+  const reposContributedTo = u.repositoriesContributedTo?.totalCount ?? 0;
+  const organizations = u.organizations?.totalCount ?? 0;
 
   return {
     user: {
@@ -143,8 +184,8 @@ export async function fetchFullProfile(username: string, token: string): Promise
       avatar_url: u.avatarUrl,
       bio: null,
       public_repos: u.repositories.totalCount,
-      followers: u.followers.totalCount,
-      following: u.following?.totalCount ?? 0,
+      followers,
+      following,
       created_at: u.createdAt,
     },
     repos: [],
@@ -152,10 +193,23 @@ export async function fetchFullProfile(username: string, token: string): Promise
     topLanguages,
     originalRepos,
     forkedRepos,
+    totalForksReceived,
+    languageCount,
+    accountAge,
+    followerRatio,
     totalContributions: calendar.totalContributions,
     currentStreak: streaks.currentStreak,
     longestStreak: streaks.longestStreak,
-    mergedPRs: u.pullRequests.totalCount,
+    mergedPRs,
+    openPRs,
+    closedPRs,
+    prMergeRate,
+    closedIssues,
+    openIssues,
+    issueCloseRate,
+    weekendPct,
+    reposContributedTo,
+    organizations,
     personality,
     velocity,
     avgPerDay,

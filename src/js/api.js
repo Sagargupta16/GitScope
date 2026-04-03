@@ -31,6 +31,10 @@ const PROFILE_QUERY = `
       openPRs: pullRequests(states: OPEN, first: 1) { totalCount }
       closedPRs: pullRequests(states: CLOSED, first: 1) { totalCount }
       issues(first: 1) { totalCount }
+      closedIssues: issues(states: CLOSED, first: 1) { totalCount }
+      openIssues: issues(states: OPEN, first: 1) { totalCount }
+      repositoriesContributedTo(first: 1, contributionTypes: [COMMIT, PULL_REQUEST, ISSUE]) { totalCount }
+      organizations { totalCount }
       contributionsCollection {
         totalCommitContributions
         totalPullRequestContributions
