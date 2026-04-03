@@ -1,7 +1,7 @@
 // Content script entry point - runs on every GitHub page
 
 import { isProfilePage, getProfileUsername } from "./utils.js";
-import { getSavedToken } from "./storage.js";
+import { getSavedToken, saveViewerStats, getViewerStats } from "./storage.js";
 import { fetchProfileInsights } from "./api.js";
 import { buildInsightsPanel, injectDashboard, showTokenPrompt, showLoadingSkeleton, showErrorState } from "./dashboard.js";
 
@@ -32,7 +32,28 @@ async function init() {
     }
 
     document.getElementById("gpi-panel")?.parentElement?.remove();
-    const panel = buildInsightsPanel(data);
+
+    // Determine if viewing own profile or someone else's
+    const viewerLogin = data.user.login;
+    const isOwnProfile = viewerLogin.toLowerCase() === username.toLowerCase();
+
+    if (isOwnProfile) {
+      const calendar = data.user.contributionsCollection.contributionCalendar;
+      await saveViewerStats({
+        login: viewerLogin,
+        totalContributions: calendar.totalContributions,
+        totalStars: data.user.repositories.nodes.reduce((s, r) => s + r.stargazerCount, 0),
+        totalRepos: data.user.repositories.totalCount,
+        mergedPRs: data.user.pullRequests.totalCount,
+      });
+    }
+
+    let viewerStats = null;
+    if (!isOwnProfile) {
+      viewerStats = await getViewerStats();
+    }
+
+    const panel = buildInsightsPanel(data, viewerStats);
     injectDashboard(panel);
   } catch (err) {
     console.error("[GPI] Error:", err);

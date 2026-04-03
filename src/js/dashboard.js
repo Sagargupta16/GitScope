@@ -4,7 +4,9 @@ import { formatNumber } from "./utils.js";
 import {
   renderLanguageBar, renderLanguageLegend,
   computeStreaks, renderMiniHeatmap,
-  renderContributionDonut, renderWeekdayChart
+  renderContributionDonut, renderWeekdayChart,
+  computePersonality, computeVelocity, computeAvgPerDay,
+  renderRepoTimeline
 } from "./charts.js";
 
 function el(tag, className, innerHTML) {
@@ -14,7 +16,7 @@ function el(tag, className, innerHTML) {
   return e;
 }
 
-export function buildInsightsPanel(data) {
+export function buildInsightsPanel(data, viewerStats = null) {
   const user = data.user;
   const contribs = user.contributionsCollection;
   const calendar = contribs.contributionCalendar;
@@ -47,8 +49,21 @@ export function buildInsightsPanel(data) {
 
   // PR stats
   const mergedPRs = user.pullRequests.totalCount;
-  const openPRs = user.openPRs.totalCount;
-  const closedPRs = user.closedPRs.totalCount;
+
+  // Fork ratio
+  const totalRepos = user.repositories.nodes.length;
+  const forkCount = user.repositories.nodes.filter(r => r.isFork).length;
+  const originalCount = totalRepos - forkCount;
+
+  // New computed stats
+  const personality = computePersonality(
+    contribs.totalCommitContributions,
+    contribs.totalPullRequestContributions,
+    contribs.totalPullRequestReviewContributions,
+    contribs.totalIssueContributions
+  );
+  const velocity = computeVelocity(calendar);
+  const avgPerDay = computeAvgPerDay(calendar);
 
   // Build panel
   const panel = el("div", "gpi-panel");
@@ -80,6 +95,22 @@ export function buildInsightsPanel(data) {
     statsGrid.appendChild(card);
   }
   panel.appendChild(statsGrid);
+
+  // Personality badge + quick insights row
+  const insightsRow = el("div", "gpi-section gpi-insights-row");
+  const velocityArrow = velocity.trend === "up" ? "&#9650;" : velocity.trend === "down" ? "&#9660;" : "&#8212;";
+  const velocityClass = velocity.trend === "up" ? "gpi-trend-up" : velocity.trend === "down" ? "gpi-trend-down" : "gpi-trend-neutral";
+  insightsRow.innerHTML =
+    `<div class="gpi-personality">` +
+    `<span class="gpi-personality-label">${personality.label}</span>` +
+    `<span class="gpi-personality-desc">${personality.description}</span>` +
+    `</div>` +
+    `<div class="gpi-quick-stats">` +
+    `<span class="gpi-quick-stat" title="Average contributions per active day">${avgPerDay}/day</span>` +
+    `<span class="gpi-quick-stat ${velocityClass}" title="Velocity: last 4 weeks vs previous 4 weeks">${velocityArrow} Velocity</span>` +
+    `<span class="gpi-quick-stat" title="${originalCount} original, ${forkCount} forked">${originalCount}/${forkCount} own/fork</span>` +
+    `</div>`;
+  panel.appendChild(insightsRow);
 
   // Languages
   if (languages.length > 0) {
@@ -150,6 +181,15 @@ export function buildInsightsPanel(data) {
   weekdaySection.appendChild(renderWeekdayChart(streaks.dayOfWeekCounts, streaks.dayNames));
   panel.appendChild(weekdaySection);
 
+  // Repo growth timeline
+  const timeline = renderRepoTimeline(user.repositories.nodes.filter(r => !r.isFork && !r.isArchived));
+  if (timeline) {
+    const timelineSection = el("div", "gpi-section");
+    timelineSection.appendChild(el("div", "gpi-section-title", "Repo Growth"));
+    timelineSection.appendChild(timeline);
+    panel.appendChild(timelineSection);
+  }
+
   // Busiest day + extra stats
   const footerStats = [];
   if (streaks.busiestDay.contributionCount > 0) {
@@ -162,6 +202,32 @@ export function buildInsightsPanel(data) {
 
   if (footerStats.length > 0) {
     panel.appendChild(el("div", "gpi-section gpi-footer-stats", footerStats.join(" &middot; ")));
+  }
+
+  // Profile comparison (when viewing someone else's profile)
+  if (viewerStats) {
+    const compareSection = el("div", "gpi-section gpi-compare-section");
+    compareSection.appendChild(el("div", "gpi-section-title", `vs. You (${viewerStats.login})`));
+    const compareGrid = el("div", "gpi-compare-grid");
+
+    const comparisons = [
+      { label: "Contributions", theirs: calendar.totalContributions, yours: viewerStats.totalContributions },
+      { label: "Stars", theirs: totalStars, yours: viewerStats.totalStars },
+      { label: "Repos", theirs: user.repositories.totalCount, yours: viewerStats.totalRepos },
+      { label: "Merged PRs", theirs: mergedPRs, yours: viewerStats.mergedPRs },
+    ];
+
+    for (const c of comparisons) {
+      const diff = c.theirs - c.yours;
+      const arrow = diff > 0 ? "+" : "";
+      compareGrid.appendChild(el("div", "gpi-compare-row",
+        `<span class="gpi-compare-label">${c.label}</span>` +
+        `<span class="gpi-compare-theirs">${formatNumber(c.theirs)}</span>` +
+        `<span class="gpi-compare-diff ${diff > 0 ? "gpi-diff-pos" : diff < 0 ? "gpi-diff-neg" : ""}">${arrow}${formatNumber(diff)}</span>`
+      ));
+    }
+    compareSection.appendChild(compareGrid);
+    panel.appendChild(compareSection);
   }
 
   return panel;

@@ -21,6 +21,7 @@ const PROFILE_QUERY = `
           stargazerCount
           forkCount
           primaryLanguage { name color }
+          createdAt
           updatedAt
           isArchived
           isFork

@@ -183,6 +183,118 @@
   display: inline-block;
 }
 
+/* Personality + Quick Insights Row */
+.gpi-insights-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gpi-personality {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gpi-personality-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fgColor-default, #24292f);
+}
+
+.gpi-personality-desc {
+  font-size: 11px;
+  color: var(--fgColor-muted, #656d76);
+}
+
+.gpi-quick-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gpi-quick-stat {
+  font-size: 11px;
+  color: var(--fgColor-muted, #656d76);
+  background: var(--bgColor-muted, #f6f8fa);
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.gpi-trend-up { color: #238636; }
+.gpi-trend-down { color: #da3633; }
+.gpi-trend-neutral { color: var(--fgColor-muted, #656d76); }
+
+/* Repo Growth Timeline */
+.gpi-timeline {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 40px;
+}
+
+.gpi-timeline-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.gpi-timeline-bar {
+  width: 100%;
+  background: #40c463;
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.3s ease;
+}
+
+.gpi-timeline-label {
+  font-size: 9px;
+  color: var(--fgColor-muted, #656d76);
+  margin-top: 3px;
+}
+
+/* Profile Comparison */
+.gpi-compare-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gpi-compare-row {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.gpi-compare-label {
+  flex: 1;
+  color: var(--fgColor-muted, #656d76);
+}
+
+.gpi-compare-theirs {
+  font-weight: 600;
+  color: var(--fgColor-default, #24292f);
+  min-width: 45px;
+  text-align: right;
+}
+
+.gpi-compare-diff {
+  font-size: 11px;
+  min-width: 50px;
+  text-align: right;
+  color: var(--fgColor-muted, #656d76);
+}
+
+.gpi-diff-pos { color: #238636; }
+.gpi-diff-neg { color: #da3633; }
+
 /* Footer stats */
 .gpi-footer-stats {
   font-size: 11px;
@@ -257,6 +369,10 @@
 [data-dark-theme="dark"] .gpi-weekday-bar { background: #26a641; }
 [data-color-mode="dark"] .gpi-weekday-bar-active,
 [data-dark-theme="dark"] .gpi-weekday-bar-active { background: #58a6ff !important; }
+[data-color-mode="dark"] .gpi-timeline-bar,
+[data-dark-theme="dark"] .gpi-timeline-bar { background: #26a641; }
+[data-color-mode="dark"] .gpi-quick-stat,
+[data-dark-theme="dark"] .gpi-quick-stat { background: #161b22; }
 
 /* Fallback for system preference */
 @media (prefers-color-scheme: dark) {
@@ -267,4 +383,6 @@
   .gpi-heatmap-cell[data-level="4"] { background: #39d353; }
   .gpi-weekday-bar { background: #26a641; }
   .gpi-weekday-bar-active { background: #58a6ff !important; }
+  .gpi-timeline-bar { background: #26a641; }
+  .gpi-quick-stat { background: #161b22; }
 }

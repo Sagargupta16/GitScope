@@ -19,12 +19,17 @@
 ## Features
 
 - **Stats Grid** - Total stars, yearly contributions, current/longest streak, merged PRs, repository count
+- **Coding Personality** - Badge like "Builder", "Reviewer", or "Collaborator" based on contribution mix
+- **Quick Insights** - Avg contributions per active day, velocity trend, own/fork ratio
 - **Language Breakdown** - Color-coded bar chart and legend showing language distribution
 - **Top Repositories** - Top 5 repos by stars with language and star count
-- **Activity Heatmap** - Compact 20-week contribution heatmap
+- **Activity Heatmap** - Compact 20-week contribution heatmap with Less/More legend
 - **Contribution Donut** - Commits, PRs, reviews, and issues breakdown chart
 - **Activity by Day** - Bar chart showing which day of the week you're most active
+- **Repo Growth Timeline** - Bar chart showing repository creation history by year
+- **Profile Comparison** - Compare any profile against your own stats (contributions, stars, repos, PRs)
 - **Footer Stats** - Busiest day of the year, starred repos count
+- **Error State** - Friendly error message with retry button
 - **Loading Skeleton** - Shimmer animation while data loads
 - **Dark Theme** - Automatically adapts to GitHub's light/dark theme
 - **SPA Navigation** - Works across GitHub page transitions (turbo:load)
