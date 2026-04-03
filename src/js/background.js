@@ -14,7 +14,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then(data => {
         if (data?.errors) {
           console.error("[GPI] GraphQL errors:", JSON.stringify(data.errors, null, 2));
-          // Still return partial data if available
           sendResponse(data?.data || null);
         } else {
           sendResponse(data?.data || null);
@@ -24,7 +23,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.error("[GPI] Fetch error:", err);
         sendResponse(null);
       });
-    return true; // keep channel open for async response
+    return true;
   }
 
   if (message.type === "GPI_FETCH_USER") {

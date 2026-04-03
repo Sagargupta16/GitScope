@@ -6,7 +6,7 @@ export default {
 
     // Step 1: Redirect user to GitHub OAuth
     if (url.pathname === "/login") {
-      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user%20read:org%20repo`;
+      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user%20read:org`;
       return Response.redirect(githubUrl, 302);
     }
 
@@ -48,6 +48,7 @@ export default {
 };
 
 function renderPage(title, message, status, token) {
+  const safeToken = token ? JSON.stringify(token) : null;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,16 +68,14 @@ function renderPage(title, message, status, token) {
     <h1>${title}</h1>
     <p>${message}</p>
   </div>
-  ${token ? `<script>
-    // Store token in localStorage so the extension content script can read it
-    document.body.setAttribute("data-gpi-token", "${token}");
-    // Also try opener (if popup was opened via window.open)
+  ${safeToken ? `<script>
+    var t = ${safeToken};
+    document.body.setAttribute("data-gpi-token", t);
     try {
       if (window.opener) {
-        window.opener.postMessage({ type: "GPI_AUTH_TOKEN", token: "${token}" }, "*");
+        window.opener.postMessage({ type: "GPI_AUTH_TOKEN", token: t }, "*");
       }
     } catch(e) {}
-    // Auto-close after brief delay
     setTimeout(function() { window.close(); }, 2000);
   </script>` : ""}
 </body>
