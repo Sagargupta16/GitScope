@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { Landing } from "./pages/Landing";
 import { Compare } from "./pages/Compare";
+import { Leaderboard } from "./pages/Leaderboard";
 import { Privacy } from "./pages/Privacy";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
@@ -13,6 +14,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/compare" element={<Compare />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/privacy" element={<Privacy />} />
         </Routes>
       </main>
