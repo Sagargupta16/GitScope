@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-04-03
+
+### Added
+
+- **Website** at [sagargupta16.github.io/GitScope](https://sagargupta16.github.io/GitScope/)
+  - Landing page with feature showcase, screenshots, and Chrome Web Store install CTA
+  - Compare tool: side-by-side GitHub profile comparison with head-to-head scoring
+  - Leaderboard: rank yourself against everyone you follow (stars, repos, followers)
+  - Privacy policy page (migrated from static HTML to React route)
+  - Hybrid auth: basic stats without login (REST API), full stats with GitHub sign-in (GraphQL)
+- Web OAuth flow via Cloudflare Worker using `state` parameter to share callback URL
+- CLAUDE.md with project guidance for AI assistants
+
+### Changed
+
+- Cloudflare Worker now handles both extension and website OAuth flows through single `/callback` endpoint
+- Updated README with website features, project structure, and dual tech stack docs
+- Updated CONTRIBUTING.md with website and worker development instructions
+- GitHub Pages workflow now builds React app with pnpm instead of serving static files
+
+### Tech Stack (Website)
+
+- React 19, TypeScript 6, Vite 8, Tailwind CSS v4, React Router v7
+
 ## [1.1.0] - 2026-04-03
 
 ### Added
@@ -54,5 +78,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Privacy policy (PRIVACY.md)
 - Manifest V3
 
+[1.2.0]: https://github.com/Sagargupta16/GitScope/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Sagargupta16/GitScope/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Sagargupta16/GitScope/releases/tag/v1.0.0
