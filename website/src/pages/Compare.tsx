@@ -10,7 +10,7 @@ function isFullStats(stats: ProfileStats): stats is FullProfileStats {
 }
 
 function ProfileCard({ stats }: { stats: ProfileStats }) {
-  const { user, totalStars, topLanguages, originalRepos, forkedRepos } = stats;
+  const { user, totalStars, topLanguages, originalRepos, forkedRepos, totalForksReceived, languageCount, accountAge, followerRatio } = stats;
   const joinYear = new Date(user.created_at).getFullYear();
   const full = isFullStats(stats) ? stats : null;
 
@@ -29,27 +29,37 @@ function ProfileCard({ stats }: { stats: ProfileStats }) {
             {user.name || user.login}
           </a>
           <span className="text-sm text-[var(--color-github-muted)]">
-            @{user.login} &middot; Since {joinYear}
+            @{user.login} &middot; Since {joinYear} ({accountAge}y)
           </span>
         </div>
       </div>
 
-      {/* Personality badge (full only) */}
+      {/* Personality badge + quick stats (full only) */}
       {full && (
-        <div className="px-4 py-2 border-b border-[var(--color-github-border)] flex items-center justify-between">
-          <div>
-            <span className="text-sm font-semibold">{full.personality.label}</span>
-            <span className="text-xs text-[var(--color-github-muted)] ml-2">{full.personality.description}</span>
+        <div className="px-4 py-2 border-b border-[var(--color-github-border)]">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <span className="text-sm font-semibold">{full.personality.label}</span>
+              <span className="text-xs text-[var(--color-github-muted)] ml-2">{full.personality.description}</span>
+            </div>
+            {full.velocity.trend !== "neutral" && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                full.velocity.trend === "up"
+                  ? "text-green-400 bg-green-950/40"
+                  : "text-red-400 bg-red-950/40"
+              }`}>
+                {full.velocity.trend === "up" ? "\u25B2" : "\u25BC"} velocity
+              </span>
+            )}
           </div>
-          {full.velocity.trend !== "neutral" && (
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              full.velocity.trend === "up"
-                ? "text-green-400 bg-green-950/40"
-                : "text-red-400 bg-red-950/40"
-            }`}>
-              {full.velocity.trend === "up" ? "\u25B2" : "\u25BC"} velocity
-            </span>
-          )}
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{full.avgPerDay}/day</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{full.weekendPct}% weekends</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{languageCount} langs</span>
+            {full.organizations > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{full.organizations} orgs</span>
+            )}
+          </div>
         </div>
       )}
 
@@ -65,13 +75,18 @@ function ProfileCard({ stats }: { stats: ProfileStats }) {
                 { label: "Streak", value: `${full.currentStreak}d` },
                 { label: "Best Streak", value: `${full.longestStreak}d` },
                 { label: "Merged PRs", value: formatNumber(full.mergedPRs) },
-                { label: "Avg/Day", value: String(full.avgPerDay) },
+                { label: "PR Rate", value: `${full.prMergeRate}%` },
+                { label: "Issues", value: `${full.issueCloseRate}% closed` },
+                { label: "Forks", value: formatNumber(totalForksReceived) },
+                { label: "Contributed To", value: formatNumber(full.reposContributedTo) },
                 { label: "Own/Fork", value: `${originalRepos}/${forkedRepos}` },
               ]
             : [
                 { label: "Following", value: formatNumber(user.following) },
-                { label: "Original", value: String(originalRepos) },
-                { label: "Forked", value: String(forkedRepos) },
+                { label: "Forks", value: formatNumber(totalForksReceived) },
+                { label: "Own/Fork", value: `${originalRepos}/${forkedRepos}` },
+                { label: "Ratio", value: followerRatio },
+                { label: "Languages", value: String(languageCount) },
               ]),
         ].map((s) => (
           <div key={s.label} className="bg-[var(--color-github-dark)] p-3 text-center">
@@ -85,7 +100,7 @@ function ProfileCard({ stats }: { stats: ProfileStats }) {
       {topLanguages.length > 0 && (
         <div className="p-4 border-t border-[var(--color-github-border)]">
           <div className="text-xs font-semibold text-[var(--color-github-muted)] uppercase tracking-wide mb-2">
-            Languages
+            Languages ({languageCount})
           </div>
           <div className="flex h-2 rounded overflow-hidden mb-2">
             {topLanguages.map((l) => (
@@ -114,11 +129,16 @@ function ComparisonTable({ left, right }: { left: ProfileStats; right: ProfileSt
   const fullLeft = isFullStats(left) ? left : null;
   const fullRight = isFullStats(right) ? right : null;
 
-  const rows: { label: string; l: number; r: number }[] = [
+  type Row = { label: string; l: number; r: number; fmt?: "pct" | "dec" };
+
+  const rows: Row[] = [
     { label: "Stars", l: left.totalStars, r: right.totalStars },
     { label: "Repos", l: left.user.public_repos, r: right.user.public_repos },
     { label: "Followers", l: left.user.followers, r: right.user.followers },
     { label: "Original Repos", l: left.originalRepos, r: right.originalRepos },
+    { label: "Forks Received", l: left.totalForksReceived, r: right.totalForksReceived },
+    { label: "Languages", l: left.languageCount, r: right.languageCount },
+    { label: "Account Age", l: left.accountAge, r: right.accountAge },
   ];
 
   if (fullLeft && fullRight) {
@@ -127,7 +147,12 @@ function ComparisonTable({ left, right }: { left: ProfileStats; right: ProfileSt
       { label: "Current Streak", l: fullLeft.currentStreak, r: fullRight.currentStreak },
       { label: "Best Streak", l: fullLeft.longestStreak, r: fullRight.longestStreak },
       { label: "Merged PRs", l: fullLeft.mergedPRs, r: fullRight.mergedPRs },
-      { label: "Avg/Day", l: fullLeft.avgPerDay, r: fullRight.avgPerDay },
+      { label: "PR Merge Rate", l: fullLeft.prMergeRate, r: fullRight.prMergeRate, fmt: "pct" },
+      { label: "Issue Close Rate", l: fullLeft.issueCloseRate, r: fullRight.issueCloseRate, fmt: "pct" },
+      { label: "Avg/Day", l: fullLeft.avgPerDay, r: fullRight.avgPerDay, fmt: "dec" },
+      { label: "Weekend %", l: fullLeft.weekendPct, r: fullRight.weekendPct, fmt: "pct" },
+      { label: "Contributed To", l: fullLeft.reposContributedTo, r: fullRight.reposContributedTo },
+      { label: "Organizations", l: fullLeft.organizations, r: fullRight.organizations },
     );
   }
 
@@ -156,18 +181,23 @@ function ComparisonTable({ left, right }: { left: ProfileStats; right: ProfileSt
       {rows.map((row) => {
         const leftWin = row.l > row.r;
         const rightWin = row.r > row.l;
+        const fmtVal = (v: number) => {
+          if (row.fmt === "pct") return `${v}%`;
+          if (row.fmt === "dec") return v.toFixed(1);
+          return formatNumber(v);
+        };
         return (
           <div key={row.label} className="flex items-center border-b border-[var(--color-github-border)] last:border-0">
             <div className={`flex-1 p-3 text-right text-sm font-semibold ${leftWin ? "text-[var(--color-brand)]" : ""}`}>
-              {row.label === "Avg/Day" ? row.l.toFixed(1) : formatNumber(row.l)}
+              {fmtVal(row.l)}
               {leftWin && <span className="ml-1 text-xs">&#10003;</span>}
             </div>
-            <div className="px-3 text-xs text-[var(--color-github-muted)] w-28 text-center shrink-0">
+            <div className="px-3 text-xs text-[var(--color-github-muted)] w-32 text-center shrink-0">
               {row.label}
             </div>
             <div className={`flex-1 p-3 text-left text-sm font-semibold ${rightWin ? "text-[var(--color-brand)]" : ""}`}>
               {rightWin && <span className="mr-1 text-xs">&#10003;</span>}
-              {row.label === "Avg/Day" ? row.r.toFixed(1) : formatNumber(row.r)}
+              {fmtVal(row.r)}
             </div>
           </div>
         );

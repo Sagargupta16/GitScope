@@ -26,6 +26,10 @@ export interface ProfileStats {
   topLanguages: Language[];
   originalRepos: number;
   forkedRepos: number;
+  totalForksReceived: number;
+  languageCount: number;
+  accountAge: number;
+  followerRatio: string;
 }
 
 export interface Language {
@@ -41,6 +45,15 @@ export interface FullProfileStats extends ProfileStats {
   currentStreak: number;
   longestStreak: number;
   mergedPRs: number;
+  openPRs: number;
+  closedPRs: number;
+  prMergeRate: number;
+  closedIssues: number;
+  openIssues: number;
+  issueCloseRate: number;
+  weekendPct: number;
+  reposContributedTo: number;
+  organizations: number;
   personality: Personality;
   velocity: Velocity;
   avgPerDay: number;

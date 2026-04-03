@@ -39,12 +39,16 @@ async function init() {
 
     if (isOwnProfile) {
       const calendar = data.user.contributionsCollection.contributionCalendar;
+      const repos = data.user.repositories.nodes;
       await saveViewerStats({
         login: viewerLogin,
         totalContributions: calendar.totalContributions,
-        totalStars: data.user.repositories.nodes.reduce((s, r) => s + r.stargazerCount, 0),
+        totalStars: repos.reduce((s, r) => s + r.stargazerCount, 0),
         totalRepos: data.user.repositories.totalCount,
         mergedPRs: data.user.pullRequests.totalCount,
+        totalForks: repos.reduce((s, r) => s + (r.forkCount || 0), 0),
+        followers: data.user.followers.totalCount,
+        reposContributedTo: data.user.repositoriesContributedTo?.totalCount ?? 0,
       });
     }
 

@@ -6,6 +6,7 @@ import {
   computeStreaks, renderMiniHeatmap,
   renderContributionDonut, renderWeekdayChart,
   computePersonality, computeVelocity, computeAvgPerDay,
+  computeWeekendPct, computePRMergeRate, computeIssueCloseRate,
   renderRepoTimeline
 } from "./charts.js";
 
@@ -49,13 +50,27 @@ export function buildInsightsPanel(data, viewerStats = null) {
 
   // PR stats
   const mergedPRs = user.pullRequests.totalCount;
+  const openPRs = user.openPRs?.totalCount ?? 0;
+  const closedPRs = user.closedPRs?.totalCount ?? 0;
+  const prMergeRate = computePRMergeRate(mergedPRs, openPRs, closedPRs);
 
-  // Fork ratio
+  // Issue stats
+  const totalIssues = user.issues?.totalCount ?? 0;
+  const closedIssues = user.closedIssues?.totalCount ?? 0;
+  const openIssues = user.openIssues?.totalCount ?? 0;
+  const issueCloseRate = computeIssueCloseRate(closedIssues, openIssues);
+
+  // Fork ratio & forks received
   const totalRepos = user.repositories.nodes.length;
   const forkCount = user.repositories.nodes.filter(r => r.isFork).length;
   const originalCount = totalRepos - forkCount;
+  const totalForksReceived = user.repositories.nodes.reduce((sum, r) => sum + (r.forkCount || 0), 0);
 
-  // New computed stats
+  // Community stats
+  const reposContributedTo = user.repositoriesContributedTo?.totalCount ?? 0;
+  const orgCount = user.organizations?.totalCount ?? 0;
+
+  // Computed stats
   const personality = computePersonality(
     contribs.totalCommitContributions,
     contribs.totalPullRequestContributions,
@@ -64,6 +79,12 @@ export function buildInsightsPanel(data, viewerStats = null) {
   );
   const velocity = computeVelocity(calendar);
   const avgPerDay = computeAvgPerDay(calendar);
+  const weekendPct = computeWeekendPct(calendar);
+  const languageCount = Object.keys(langMap).length;
+  const accountAge = new Date().getFullYear() - new Date(user.createdAt).getFullYear();
+  const followerRatio = user.following?.totalCount > 0
+    ? (user.followers.totalCount / user.following.totalCount).toFixed(1)
+    : user.followers.totalCount > 0 ? "\u221e" : "0";
 
   // Build panel
   const panel = el("div", "gpi-panel");
@@ -76,7 +97,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
     `<span class="gpi-badge">Member since ${joinYear}</span>`
   ));
 
-  // Stats grid
+  // Stats grid (3x3)
   const statsGrid = el("div", "gpi-stats-grid");
   const stats = [
     { label: "Stars", value: formatNumber(totalStars), raw: totalStars.toLocaleString() },
@@ -84,7 +105,10 @@ export function buildInsightsPanel(data, viewerStats = null) {
     { label: "Streak", value: `${streaks.currentStreak}d`, raw: `${streaks.currentStreak} consecutive days` },
     { label: "Best Streak", value: `${streaks.longestStreak}d`, raw: `${streaks.longestStreak} consecutive days` },
     { label: "Merged PRs", value: formatNumber(mergedPRs), raw: mergedPRs.toLocaleString() },
+    { label: "PR Rate", value: `${prMergeRate}%`, raw: `${mergedPRs} merged of ${mergedPRs + openPRs + closedPRs} total` },
     { label: "Repos", value: formatNumber(user.repositories.totalCount), raw: user.repositories.totalCount.toLocaleString() },
+    { label: "Forked", value: formatNumber(totalForksReceived), raw: `${totalForksReceived.toLocaleString()} forks of your repos` },
+    { label: "Issues", value: `${issueCloseRate}% closed`, raw: `${closedIssues} closed of ${closedIssues + openIssues} total` },
   ];
   for (const stat of stats) {
     const card = el("div", "gpi-stat-card",
@@ -109,6 +133,8 @@ export function buildInsightsPanel(data, viewerStats = null) {
     `<span class="gpi-quick-stat" title="Average contributions per active day">${avgPerDay}/day</span>` +
     `<span class="gpi-quick-stat ${velocityClass}" title="Velocity: last 4 weeks vs previous 4 weeks">${velocityArrow} Velocity</span>` +
     `<span class="gpi-quick-stat" title="${originalCount} original, ${forkCount} forked">${originalCount}/${forkCount} own/fork</span>` +
+    `<span class="gpi-quick-stat" title="${weekendPct}% of contributions on weekends">${weekendPct}% weekends</span>` +
+    `<span class="gpi-quick-stat" title="Codes in ${languageCount} languages">${languageCount} langs</span>` +
     `</div>`;
   panel.appendChild(insightsRow);
 
@@ -190,6 +216,22 @@ export function buildInsightsPanel(data, viewerStats = null) {
     panel.appendChild(timelineSection);
   }
 
+  // Community & impact section
+  const communityItems = [];
+  if (reposContributedTo > 0) communityItems.push(`Contributed to <strong>${reposContributedTo}</strong> external repos`);
+  if (orgCount > 0) communityItems.push(`Member of <strong>${orgCount}</strong> orgs`);
+  communityItems.push(`Follower ratio: <strong>${followerRatio}</strong> (${user.followers.totalCount}/${user.following?.totalCount ?? 0})`);
+  communityItems.push(`${accountAge} years on GitHub`);
+
+  const communitySection = el("div", "gpi-section gpi-community-section");
+  communitySection.appendChild(el("div", "gpi-section-title", "Community & Impact"));
+  const communityGrid = el("div", "gpi-community-grid");
+  for (const item of communityItems) {
+    communityGrid.appendChild(el("div", "gpi-community-item", item));
+  }
+  communitySection.appendChild(communityGrid);
+  panel.appendChild(communitySection);
+
   // Busiest day + extra stats
   const footerStats = [];
   if (streaks.busiestDay.contributionCount > 0) {
@@ -198,6 +240,9 @@ export function buildInsightsPanel(data, viewerStats = null) {
   }
   if (user.starredRepositories?.totalCount > 0) {
     footerStats.push(`Starred repos: <strong>${formatNumber(user.starredRepositories.totalCount)}</strong>`);
+  }
+  if (totalIssues > 0) {
+    footerStats.push(`Issues opened: <strong>${formatNumber(totalIssues)}</strong>`);
   }
 
   if (footerStats.length > 0) {
@@ -215,6 +260,8 @@ export function buildInsightsPanel(data, viewerStats = null) {
       { label: "Stars", theirs: totalStars, yours: viewerStats.totalStars },
       { label: "Repos", theirs: user.repositories.totalCount, yours: viewerStats.totalRepos },
       { label: "Merged PRs", theirs: mergedPRs, yours: viewerStats.mergedPRs },
+      { label: "Forks Received", theirs: totalForksReceived, yours: viewerStats.totalForks ?? 0 },
+      { label: "Followers", theirs: user.followers.totalCount, yours: viewerStats.followers ?? 0 },
     ];
 
     for (const c of comparisons) {
