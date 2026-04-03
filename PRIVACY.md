@@ -10,13 +10,15 @@ This extension does **not** collect, store, or transmit any personal data to the
 
 ## What Data Is Accessed
 
-The extension accesses the following data from GitHub's public API:
+The extension and website access the following data from GitHub's API:
 
 - Public profile information (name, username, avatar, follower/following counts)
 - Public repository data (names, stars, languages, fork counts)
 - Contribution calendar data (contribution counts by date)
 - Pull request counts (merged, open, closed)
-- Issue counts
+- Issue counts (open, closed)
+- Repositories contributed to (count only)
+- Organization membership (count only)
 
 This data is fetched from GitHub's GraphQL API (`api.github.com`) using your authenticated session and is only used to render the insights dashboard on profile pages.
 
@@ -29,8 +31,9 @@ This data is fetched from GitHub's GraphQL API (`api.github.com`) using your aut
 
 ## Data Storage
 
-- **OAuth token**: Stored in `chrome.storage.sync` (local to your browser, synced across your Chrome instances if signed in)
-- **API cache**: Profile data is cached in `chrome.storage.local` for 5 minutes to reduce API calls. Cache is automatically cleared after expiry.
+- **OAuth token**: Stored in `chrome.storage.sync` (extension) or `localStorage` (website). Local to your browser only.
+- **Extension cache**: Profile data is cached in `chrome.storage.local` for 5 minutes to reduce API calls. Cache is automatically cleared after expiry.
+- **Website cache**: Leaderboard data is cached in `localStorage` for 10 minutes. Cleared on sign-out or manual refresh.
 - No data is stored on any external server
 
 ## Network Requests

@@ -21,24 +21,26 @@
 
 ### Chrome Extension
 
-- **Stats Grid** - Total stars, yearly contributions, current/longest streak, merged PRs, repository count
+- **Stats Grid** - 9 stats: stars, contributions, streaks, merged PRs, PR merge rate, repos, forks received, issue close rate
 - **Coding Personality** - Badge like "Builder", "Reviewer", or "Collaborator" based on contribution mix
-- **Quick Insights** - Avg contributions per active day, velocity trend, own/fork ratio
+- **Quick Insights** - Avg/day, velocity trend, own/fork ratio, weekend %, language count
 - **Language Breakdown** - Color-coded bar chart and legend showing language distribution
 - **Top Repositories** - Top 5 repos by stars with language and star count
 - **Activity Heatmap** - Compact 20-week contribution heatmap with Less/More legend
 - **Contribution Donut** - Commits, PRs, reviews, and issues breakdown chart
 - **Activity by Day** - Bar chart showing which day of the week you're most active
 - **Repo Growth Timeline** - Bar chart showing repository creation history by year
-- **Profile Comparison** - Compare any profile against your own stats
+- **Community & Impact** - Repos contributed to, organizations, follower ratio, account age
+- **Profile Comparison** - Compare any profile against your own (contributions, stars, repos, PRs, forks, followers)
 - **Dark Theme** - Automatically adapts to GitHub's light/dark theme
 - **Caching** - 5-minute TTL to avoid redundant API calls
 
 ### Website ([sagargupta16.github.io/GitScope](https://sagargupta16.github.io/GitScope/))
 
-- **Compare Tool** - Side-by-side GitHub profile comparison with head-to-head scoring
-- **Leaderboard** - Rank yourself against everyone you follow (stars, repos, followers)
-- **Full Stats Mode** - Sign in for contributions, streaks, PRs, personality, and velocity
+- **Compare Tool** - Side-by-side profile comparison with up to 17 head-to-head stats (PR merge rate, issue close rate, weekend %, contributed to, organizations, and more)
+- **Leaderboard** - Rank yourself against everyone you follow, sortable by stars, repos, followers, forks, or languages
+- **Leaderboard Caching** - Results cached locally for 10 minutes to avoid rate limits
+- **Full Stats Mode** - Sign in for contributions, streaks, PRs, personality, velocity, and community stats
 
 ## Installation
 
@@ -143,7 +145,7 @@ GitScope/
 
 - Token stored locally (Chrome storage for extension, localStorage for website)
 - Client secret stored server-side on Cloudflare Worker
-- API responses cached locally for 5 minutes
+- API responses cached locally (extension: 5 min, leaderboard: 10 min)
 - No analytics, no tracking, no telemetry
 - Source code is fully open and auditable
 

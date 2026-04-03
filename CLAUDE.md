@@ -45,6 +45,8 @@ npx wrangler deploy      # Deploy to Cloudflare
 - GitHub theme support via CSS custom properties (`--fgColor-default`, `--bgColor-muted`, etc.)
 - Dark theme detection: `[data-color-mode="dark"]`, `[data-dark-theme="dark"]`, `@media (prefers-color-scheme: dark)`
 - All extension DOM is prefixed with `gpi-` classes to avoid CSS conflicts
+- Leaderboard data cached in `localStorage` with 10-min TTL to avoid GitHub API rate limits
+- Extension GraphQL query fetches PR states (merged/open/closed), issue states, repos contributed to, and org count in a single request
 
 ## Deployment
 
