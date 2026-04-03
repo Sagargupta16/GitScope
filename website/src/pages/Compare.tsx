@@ -1,22 +1,24 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { fetchPublicProfile } from "../lib/github";
+import { fetchPublicProfile, fetchFullProfile } from "../lib/github";
 import { formatNumber } from "../lib/analytics";
-import type { ProfileStats } from "../lib/types";
+import { getStoredToken, getLoginUrl } from "../lib/auth";
+import type { ProfileStats, FullProfileStats } from "../lib/types";
+
+function isFullStats(stats: ProfileStats): stats is FullProfileStats {
+  return "totalContributions" in stats;
+}
 
 function ProfileCard({ stats }: { stats: ProfileStats }) {
   const { user, totalStars, topLanguages, originalRepos, forkedRepos } = stats;
   const joinYear = new Date(user.created_at).getFullYear();
+  const full = isFullStats(stats) ? stats : null;
 
   return (
     <div className="rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)] overflow-hidden flex-1 min-w-0">
       {/* Header */}
       <div className="p-4 flex items-center gap-3 border-b border-[var(--color-github-border)]">
-        <img
-          src={user.avatar_url}
-          alt={user.login}
-          className="w-12 h-12 rounded-full"
-        />
+        <img src={user.avatar_url} alt={user.login} className="w-12 h-12 rounded-full" />
         <div className="min-w-0">
           <a
             href={`https://github.com/${user.login}`}
@@ -32,15 +34,45 @@ function ProfileCard({ stats }: { stats: ProfileStats }) {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-px bg-[var(--color-github-border)]">
+      {/* Personality badge (full only) */}
+      {full && (
+        <div className="px-4 py-2 border-b border-[var(--color-github-border)] flex items-center justify-between">
+          <div>
+            <span className="text-sm font-semibold">{full.personality.label}</span>
+            <span className="text-xs text-[var(--color-github-muted)] ml-2">{full.personality.description}</span>
+          </div>
+          {full.velocity.trend !== "neutral" && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              full.velocity.trend === "up"
+                ? "text-green-400 bg-green-950/40"
+                : "text-red-400 bg-red-950/40"
+            }`}>
+              {full.velocity.trend === "up" ? "\u25B2" : "\u25BC"} velocity
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 gap-px bg-[var(--color-github-border)]">
         {[
           { label: "Stars", value: formatNumber(totalStars) },
           { label: "Repos", value: formatNumber(user.public_repos) },
           { label: "Followers", value: formatNumber(user.followers) },
-          { label: "Following", value: formatNumber(user.following) },
-          { label: "Original", value: String(originalRepos) },
-          { label: "Forked", value: String(forkedRepos) },
+          ...(full
+            ? [
+                { label: "This Year", value: formatNumber(full.totalContributions) },
+                { label: "Streak", value: `${full.currentStreak}d` },
+                { label: "Best Streak", value: `${full.longestStreak}d` },
+                { label: "Merged PRs", value: formatNumber(full.mergedPRs) },
+                { label: "Avg/Day", value: String(full.avgPerDay) },
+                { label: "Own/Fork", value: `${originalRepos}/${forkedRepos}` },
+              ]
+            : [
+                { label: "Following", value: formatNumber(user.following) },
+                { label: "Original", value: String(originalRepos) },
+                { label: "Forked", value: String(forkedRepos) },
+              ]),
         ].map((s) => (
           <div key={s.label} className="bg-[var(--color-github-dark)] p-3 text-center">
             <div className="text-lg font-bold">{s.value}</div>
@@ -68,7 +100,7 @@ function ProfileCard({ stats }: { stats: ProfileStats }) {
             {topLanguages.slice(0, 5).map((l) => (
               <span key={l.name} className="text-xs text-[var(--color-github-muted)] flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: l.color }} />
-                {l.name}
+                {l.name} <span className="opacity-60">{l.percentage.toFixed(0)}%</span>
               </span>
             ))}
           </div>
@@ -79,31 +111,63 @@ function ProfileCard({ stats }: { stats: ProfileStats }) {
 }
 
 function ComparisonTable({ left, right }: { left: ProfileStats; right: ProfileStats }) {
-  const rows = [
+  const fullLeft = isFullStats(left) ? left : null;
+  const fullRight = isFullStats(right) ? right : null;
+
+  const rows: { label: string; l: number; r: number }[] = [
     { label: "Stars", l: left.totalStars, r: right.totalStars },
     { label: "Repos", l: left.user.public_repos, r: right.user.public_repos },
     { label: "Followers", l: left.user.followers, r: right.user.followers },
     { label: "Original Repos", l: left.originalRepos, r: right.originalRepos },
   ];
 
+  if (fullLeft && fullRight) {
+    rows.push(
+      { label: "Contributions", l: fullLeft.totalContributions, r: fullRight.totalContributions },
+      { label: "Current Streak", l: fullLeft.currentStreak, r: fullRight.currentStreak },
+      { label: "Best Streak", l: fullLeft.longestStreak, r: fullRight.longestStreak },
+      { label: "Merged PRs", l: fullLeft.mergedPRs, r: fullRight.mergedPRs },
+      { label: "Avg/Day", l: fullLeft.avgPerDay, r: fullRight.avgPerDay },
+    );
+  }
+
+  const leftWins = rows.filter((r) => r.l > r.r).length;
+  const rightWins = rows.filter((r) => r.r > r.l).length;
+
   return (
     <div className="rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)] overflow-hidden">
-      <div className="p-3 border-b border-[var(--color-github-border)] bg-[var(--color-github-darker)]">
-        <h3 className="text-sm font-semibold text-center">Head to Head</h3>
+      {/* Score header */}
+      <div className="flex items-center border-b border-[var(--color-github-border)] bg-[var(--color-github-darker)]">
+        <div className="flex-1 p-3 text-center">
+          <span className="text-sm font-semibold">{left.user.login}</span>
+        </div>
+        <div className="px-4 py-3 text-center shrink-0">
+          <span className="text-xl font-bold">
+            <span className={leftWins > rightWins ? "text-[var(--color-brand)]" : ""}>{leftWins}</span>
+            <span className="text-[var(--color-github-muted)] mx-1">-</span>
+            <span className={rightWins > leftWins ? "text-[var(--color-brand)]" : ""}>{rightWins}</span>
+          </span>
+        </div>
+        <div className="flex-1 p-3 text-center">
+          <span className="text-sm font-semibold">{right.user.login}</span>
+        </div>
       </div>
+
       {rows.map((row) => {
-        const leftWins = row.l > row.r;
-        const rightWins = row.r > row.l;
+        const leftWin = row.l > row.r;
+        const rightWin = row.r > row.l;
         return (
           <div key={row.label} className="flex items-center border-b border-[var(--color-github-border)] last:border-0">
-            <div className={`flex-1 p-3 text-right text-sm font-semibold ${leftWins ? "text-[var(--color-brand)]" : ""}`}>
-              {formatNumber(row.l)}
+            <div className={`flex-1 p-3 text-right text-sm font-semibold ${leftWin ? "text-[var(--color-brand)]" : ""}`}>
+              {row.label === "Avg/Day" ? row.l.toFixed(1) : formatNumber(row.l)}
+              {leftWin && <span className="ml-1 text-xs">&#10003;</span>}
             </div>
             <div className="px-3 text-xs text-[var(--color-github-muted)] w-28 text-center shrink-0">
               {row.label}
             </div>
-            <div className={`flex-1 p-3 text-left text-sm font-semibold ${rightWins ? "text-[var(--color-brand)]" : ""}`}>
-              {formatNumber(row.r)}
+            <div className={`flex-1 p-3 text-left text-sm font-semibold ${rightWin ? "text-[var(--color-brand)]" : ""}`}>
+              {rightWin && <span className="mr-1 text-xs">&#10003;</span>}
+              {row.label === "Avg/Day" ? row.r.toFixed(1) : formatNumber(row.r)}
             </div>
           </div>
         );
@@ -120,6 +184,8 @@ export function Compare() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const token = getStoredToken();
+
   async function handleCompare(e: React.FormEvent) {
     e.preventDefault();
     const u1 = user1.trim();
@@ -132,10 +198,11 @@ export function Compare() {
     setSearchParams({ user1: u1, user2: u2 });
 
     try {
-      const [left, right] = await Promise.all([
-        fetchPublicProfile(u1),
-        fetchPublicProfile(u2),
-      ]);
+      const fetcher = token
+        ? (u: string) => fetchFullProfile(u, token).catch(() => fetchPublicProfile(u))
+        : fetchPublicProfile;
+
+      const [left, right] = await Promise.all([fetcher(u1), fetcher(u2)]);
       setResults({ left, right });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -148,9 +215,27 @@ export function Compare() {
     <section className="py-12 px-6">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-2">Compare GitHub Profiles</h1>
-        <p className="text-center text-[var(--color-github-muted)] mb-8">
+        <p className="text-center text-[var(--color-github-muted)] mb-2">
           Enter two GitHub usernames to see a side-by-side comparison.
         </p>
+
+        {/* Auth hint */}
+        {!token && (
+          <p className="text-center text-xs text-[var(--color-github-muted)] mb-6">
+            <a
+              href={getLoginUrl()}
+              className="text-[var(--color-brand)] hover:underline no-underline"
+            >
+              Sign in with GitHub
+            </a>
+            {" "}for full stats: contributions, streaks, PRs, personality, and velocity.
+          </p>
+        )}
+        {token && (
+          <p className="text-center text-xs text-green-400 mb-6">
+            &#10003; Signed in - showing full stats with contributions, streaks, and PRs.
+          </p>
+        )}
 
         {/* Form */}
         <form onSubmit={handleCompare} className="flex flex-col sm:flex-row items-center gap-3 mb-10">
@@ -188,20 +273,18 @@ export function Compare() {
         {/* Results */}
         {results && (
           <div className="space-y-6">
-            {/* Profile Cards */}
             <div className="flex flex-col md:flex-row gap-6">
               <ProfileCard stats={results.left} />
               <ProfileCard stats={results.right} />
             </div>
 
-            {/* Comparison Table */}
             <ComparisonTable left={results.left} right={results.right} />
 
             {/* Share hint */}
             <p className="text-center text-xs text-[var(--color-github-muted)]">
               Share this comparison:{" "}
               <span className="text-[var(--color-github-text)] select-all">
-                {window.location.href}
+                {window.location.origin}{window.location.pathname}?user1={results.left.user.login}&user2={results.right.user.login}
               </span>
             </p>
           </div>
@@ -212,7 +295,14 @@ export function Compare() {
           <div className="text-center text-[var(--color-github-muted)] py-12">
             <p className="text-lg mb-2">Enter two usernames to get started</p>
             <p className="text-sm">
-              Try: <button type="button" onClick={() => { setUser1("torvalds"); setUser2("gvanrossum"); }} className="text-[var(--color-brand)] hover:underline bg-transparent border-none cursor-pointer">torvalds vs gvanrossum</button>
+              Try:{" "}
+              <button
+                type="button"
+                onClick={() => { setUser1("torvalds"); setUser2("gvanrossum"); }}
+                className="text-[var(--color-brand)] hover:underline bg-transparent border-none cursor-pointer"
+              >
+                torvalds vs gvanrossum
+              </button>
             </p>
           </div>
         )}
