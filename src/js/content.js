@@ -3,7 +3,7 @@
 import { isProfilePage, getProfileUsername } from "./utils.js";
 import { getSavedToken } from "./storage.js";
 import { fetchProfileInsights } from "./api.js";
-import { buildInsightsPanel, injectDashboard, showTokenPrompt, showLoadingSkeleton } from "./dashboard.js";
+import { buildInsightsPanel, injectDashboard, showTokenPrompt, showLoadingSkeleton, showErrorState } from "./dashboard.js";
 
 async function init() {
   if (!isProfilePage()) return;
@@ -18,22 +18,29 @@ async function init() {
     return;
   }
 
-  // Show loading skeleton while fetching
   showLoadingSkeleton();
 
   try {
     const data = await fetchProfileInsights(username, token);
     if (!data?.user) {
-      console.error("[GPI] Failed to fetch profile data for", username);
+      showErrorState(username);
+      document.getElementById("gpi-retry")?.addEventListener("click", () => {
+        document.getElementById("gpi-panel")?.parentElement?.remove();
+        init();
+      });
       return;
     }
 
-    // Remove skeleton and inject real dashboard
     document.getElementById("gpi-panel")?.parentElement?.remove();
     const panel = buildInsightsPanel(data);
     injectDashboard(panel);
   } catch (err) {
     console.error("[GPI] Error:", err);
+    showErrorState(username);
+    document.getElementById("gpi-retry")?.addEventListener("click", () => {
+      document.getElementById("gpi-panel")?.parentElement?.remove();
+      init();
+    });
   }
 }
 
@@ -42,7 +49,6 @@ init();
 
 // Handle GitHub SPA navigation (turbo:load for GitHub's Turbo framework)
 document.addEventListener("turbo:load", () => {
-  // Small delay to let GitHub finish rendering
   setTimeout(init, 300);
 });
 

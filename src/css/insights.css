@@ -43,6 +43,7 @@
   background: var(--bgColor-default, #ffffff);
   padding: 12px 8px;
   text-align: center;
+  cursor: default;
 }
 
 .gpi-stat-value { font-size: 18px; font-weight: 700; color: var(--fgColor-default, #24292f); line-height: 1.2; }
@@ -95,7 +96,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 140px;
+  flex: 1;
+  min-width: 0;
 }
 
 .gpi-repo-name:hover { text-decoration: underline; }
@@ -129,7 +131,7 @@
 /* Contribution Donut */
 .gpi-contrib-section { padding: 12px 16px; }
 .gpi-contrib-content { display: flex; align-items: center; gap: 16px; }
-.gpi-donut { width: 64px; height: 64px; flex-shrink: 0; }
+.gpi-donut { width: 80px; height: 80px; flex-shrink: 0; }
 .gpi-contrib-stats { display: flex; flex-direction: column; gap: 4px; }
 
 .gpi-contrib-row {
@@ -163,6 +165,23 @@
 }
 
 .gpi-weekday-label { font-size: 9px; color: var(--fgColor-muted, #656d76); margin-top: 4px; }
+.gpi-weekday-bar-active { background: var(--fgColor-accent, #0969da) !important; }
+.gpi-weekday-label-active { color: var(--fgColor-accent, #0969da); font-weight: 600; }
+
+/* Heatmap Legend */
+.gpi-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  justify-content: flex-end;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--fgColor-muted, #656d76);
+}
+
+.gpi-heatmap-legend .gpi-heatmap-cell {
+  display: inline-block;
+}
 
 /* Footer stats */
 .gpi-footer-stats {
@@ -175,6 +194,33 @@
 
 /* Token Prompt */
 .gpi-prompt-text { font-size: 13px; color: var(--fgColor-default, #24292f); margin: 0; line-height: 1.5; }
+
+.gpi-feature-list {
+  margin: 8px 0 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--fgColor-muted, #656d76);
+  line-height: 1.8;
+}
+
+/* Error State */
+.gpi-error-section { text-align: center; padding: 16px; }
+.gpi-error-text { font-size: 13px; color: var(--fgColor-muted, #656d76); margin-bottom: 10px; }
+
+.gpi-retry-btn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-radius: 6px;
+  background: var(--bgColor-default, #ffffff);
+  color: var(--fgColor-default, #24292f);
+  cursor: pointer;
+}
+
+.gpi-retry-btn:hover {
+  background: var(--bgColor-muted, #f6f8fa);
+}
 
 /* Loading Skeleton */
 .gpi-skeleton-line {
@@ -196,7 +242,23 @@
   100% { background-position: -200% 0; }
 }
 
-/* Dark theme */
+/* Dark theme - uses GitHub's data-color-mode attribute */
+[data-color-mode="dark"] .gpi-heatmap-cell[data-level="0"],
+[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="0"] { background: #161b22; }
+[data-color-mode="dark"] .gpi-heatmap-cell[data-level="1"],
+[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="1"] { background: #0e4429; }
+[data-color-mode="dark"] .gpi-heatmap-cell[data-level="2"],
+[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="2"] { background: #006d32; }
+[data-color-mode="dark"] .gpi-heatmap-cell[data-level="3"],
+[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="3"] { background: #26a641; }
+[data-color-mode="dark"] .gpi-heatmap-cell[data-level="4"],
+[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="4"] { background: #39d353; }
+[data-color-mode="dark"] .gpi-weekday-bar,
+[data-dark-theme="dark"] .gpi-weekday-bar { background: #26a641; }
+[data-color-mode="dark"] .gpi-weekday-bar-active,
+[data-dark-theme="dark"] .gpi-weekday-bar-active { background: #58a6ff !important; }
+
+/* Fallback for system preference */
 @media (prefers-color-scheme: dark) {
   .gpi-heatmap-cell[data-level="0"] { background: #161b22; }
   .gpi-heatmap-cell[data-level="1"] { background: #0e4429; }
@@ -204,4 +266,5 @@
   .gpi-heatmap-cell[data-level="3"] { background: #26a641; }
   .gpi-heatmap-cell[data-level="4"] { background: #39d353; }
   .gpi-weekday-bar { background: #26a641; }
+  .gpi-weekday-bar-active { background: #58a6ff !important; }
 }

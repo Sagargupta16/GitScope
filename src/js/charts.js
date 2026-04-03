@@ -73,6 +73,8 @@ export function computeStreaks(calendar) {
 }
 
 export function renderMiniHeatmap(calendar) {
+  const wrapper = document.createElement("div");
+
   const container = document.createElement("div");
   container.className = "gpi-heatmap";
 
@@ -95,7 +97,22 @@ export function renderMiniHeatmap(calendar) {
     }
     container.appendChild(col);
   }
-  return container;
+
+  wrapper.appendChild(container);
+
+  const legend = document.createElement("div");
+  legend.className = "gpi-heatmap-legend";
+  legend.innerHTML =
+    `<span>Less</span>` +
+    `<span class="gpi-heatmap-cell" data-level="0"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="1"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="2"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="3"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="4"></span>` +
+    `<span>More</span>`;
+  wrapper.appendChild(legend);
+
+  return wrapper;
 }
 
 export function renderContributionDonut(commits, prs, reviews, issues) {
@@ -138,6 +155,7 @@ export function renderWeekdayChart(dayOfWeekCounts, dayNames) {
   container.className = "gpi-weekday-chart";
 
   const max = Math.max(...dayOfWeekCounts);
+  const maxIndex = dayOfWeekCounts.indexOf(max);
 
   for (let i = 0; i < 7; i++) {
     const bar = document.createElement("div");
@@ -145,11 +163,13 @@ export function renderWeekdayChart(dayOfWeekCounts, dayNames) {
 
     const fill = document.createElement("div");
     fill.className = "gpi-weekday-bar";
+    if (i === maxIndex && max > 0) fill.classList.add("gpi-weekday-bar-active");
     fill.style.height = max > 0 ? `${(dayOfWeekCounts[i] / max) * 100}%` : "0%";
     fill.title = `${dayNames[i]}: ${dayOfWeekCounts[i]} contributions`;
 
     const label = document.createElement("div");
     label.className = "gpi-weekday-label";
+    if (i === maxIndex && max > 0) label.classList.add("gpi-weekday-label-active");
     label.textContent = dayNames[i];
 
     bar.appendChild(fill);

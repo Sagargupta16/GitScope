@@ -55,26 +55,29 @@ export function buildInsightsPanel(data) {
   panel.id = "gpi-panel";
 
   // Header
+  const joinYear = new Date(user.createdAt).getFullYear();
   panel.appendChild(el("div", "gpi-header",
     `<span class="gpi-title">GitScope</span>` +
-    `<span class="gpi-badge">gitscope</span>`
+    `<span class="gpi-badge">Member since ${joinYear}</span>`
   ));
 
   // Stats grid
   const statsGrid = el("div", "gpi-stats-grid");
   const stats = [
-    { label: "Stars", value: formatNumber(totalStars) },
-    { label: "This Year", value: formatNumber(calendar.totalContributions) },
-    { label: "Streak", value: `${streaks.currentStreak}d` },
-    { label: "Best Streak", value: `${streaks.longestStreak}d` },
-    { label: "Merged PRs", value: formatNumber(mergedPRs) },
-    { label: "Repos", value: formatNumber(user.repositories.totalCount) },
+    { label: "Stars", value: formatNumber(totalStars), raw: totalStars.toLocaleString() },
+    { label: "This Year", value: formatNumber(calendar.totalContributions), raw: calendar.totalContributions.toLocaleString() },
+    { label: "Streak", value: `${streaks.currentStreak}d`, raw: `${streaks.currentStreak} consecutive days` },
+    { label: "Best Streak", value: `${streaks.longestStreak}d`, raw: `${streaks.longestStreak} consecutive days` },
+    { label: "Merged PRs", value: formatNumber(mergedPRs), raw: mergedPRs.toLocaleString() },
+    { label: "Repos", value: formatNumber(user.repositories.totalCount), raw: user.repositories.totalCount.toLocaleString() },
   ];
   for (const stat of stats) {
-    statsGrid.appendChild(el("div", "gpi-stat-card",
+    const card = el("div", "gpi-stat-card",
       `<div class="gpi-stat-value">${stat.value}</div>` +
       `<div class="gpi-stat-label">${stat.label}</div>`
-    ));
+    );
+    card.title = `${stat.label}: ${stat.raw}`;
+    statsGrid.appendChild(card);
   }
   panel.appendChild(statsGrid);
 
@@ -127,7 +130,8 @@ export function buildInsightsPanel(data) {
     const contribStats = el("div", "gpi-contrib-stats");
     for (const seg of donutData.segments) {
       if (seg.value === 0) continue;
-      const pct = ((seg.value / donutData.total) * 100).toFixed(0);
+      const rawPct = (seg.value / donutData.total) * 100;
+      const pct = rawPct > 0 && rawPct < 1 ? "<1" : rawPct.toFixed(0);
       contribStats.appendChild(el("div", "gpi-contrib-row",
         `<span class="gpi-pr-dot" style="background:${seg.color}"></span>` +
         `${seg.label}: ${formatNumber(seg.value)} (${pct}%)`
@@ -150,7 +154,7 @@ export function buildInsightsPanel(data) {
   const footerStats = [];
   if (streaks.busiestDay.contributionCount > 0) {
     const bDate = new Date(streaks.busiestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    footerStats.push(`Busiest day: <strong>${bDate}</strong> (${streaks.busiestDay.contributionCount})`);
+    footerStats.push(`Busiest day: <strong>${bDate}</strong> (${streaks.busiestDay.contributionCount.toLocaleString()})`);
   }
   if (user.starredRepositories?.totalCount > 0) {
     footerStats.push(`Starred repos: <strong>${formatNumber(user.starredRepositories.totalCount)}</strong>`);
@@ -185,11 +189,39 @@ export function showTokenPrompt() {
   prompt.innerHTML =
     `<div class="gpi-header"><span class="gpi-title">GitScope</span></div>` +
     `<div class="gpi-section">` +
-    `<p class="gpi-prompt-text">Sign in with GitHub via the extension popup to see contribution insights, streaks, and language stats.</p>` +
+    `<p class="gpi-prompt-text">Sign in via the extension popup to see:</p>` +
+    `<ul class="gpi-feature-list">` +
+    `<li>Contribution streaks and heatmap</li>` +
+    `<li>Language breakdown across repos</li>` +
+    `<li>Top repositories by stars</li>` +
+    `<li>PR stats and activity patterns</li>` +
+    `</ul>` +
     `</div>`;
 
   const container = el("div", "gpi-container");
   container.appendChild(prompt);
+  sidebar.parentNode.insertBefore(container, sidebar.nextSibling);
+}
+
+export function showErrorState(username) {
+  const existing = document.getElementById("gpi-panel")?.parentElement;
+  if (existing) existing.remove();
+
+  const sidebar = document.querySelector(".Layout-sidebar .h-card") ||
+    document.querySelector(".Layout-sidebar");
+  if (!sidebar) return;
+
+  const panel = el("div", "gpi-panel gpi-error");
+  panel.id = "gpi-panel";
+  panel.innerHTML =
+    `<div class="gpi-header"><span class="gpi-title">GitScope</span></div>` +
+    `<div class="gpi-section gpi-error-section">` +
+    `<p class="gpi-error-text">Could not load data for ${username}.</p>` +
+    `<button class="gpi-retry-btn" id="gpi-retry">Retry</button>` +
+    `</div>`;
+
+  const container = el("div", "gpi-container");
+  container.appendChild(panel);
   sidebar.parentNode.insertBefore(container, sidebar.nextSibling);
 }
 
