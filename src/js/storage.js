@@ -39,3 +39,16 @@ export function setCache(key, data) {
     chrome.storage.local.set({ [key]: { data, timestamp: Date.now() } }, resolve);
   });
 }
+
+// Store the signed-in user's stats for profile comparison
+export function saveViewerStats(stats) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ gpi_viewer_stats: stats }, resolve);
+  });
+}
+
+export function getViewerStats() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["gpi_viewer_stats"], (result) => resolve(result.gpi_viewer_stats || null));
+  });
+}

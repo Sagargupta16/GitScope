@@ -13,9 +13,6 @@ const PROFILE_QUERY = `
       following { totalCount }
       starredRepositories { totalCount }
       gists { totalCount }
-      organizations(first: 5) {
-        nodes { login avatarUrl name }
-      }
       repositories(first: 100, ownerAffiliations: OWNER, orderBy: {field: STARGAZERS, direction: DESC}) {
         totalCount
         nodes {
@@ -24,6 +21,7 @@ const PROFILE_QUERY = `
           stargazerCount
           forkCount
           primaryLanguage { name color }
+          createdAt
           updatedAt
           isArchived
           isFork

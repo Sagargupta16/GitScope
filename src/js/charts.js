@@ -73,6 +73,8 @@ export function computeStreaks(calendar) {
 }
 
 export function renderMiniHeatmap(calendar) {
+  const wrapper = document.createElement("div");
+
   const container = document.createElement("div");
   container.className = "gpi-heatmap";
 
@@ -95,7 +97,22 @@ export function renderMiniHeatmap(calendar) {
     }
     container.appendChild(col);
   }
-  return container;
+
+  wrapper.appendChild(container);
+
+  const legend = document.createElement("div");
+  legend.className = "gpi-heatmap-legend";
+  legend.innerHTML =
+    `<span>Less</span>` +
+    `<span class="gpi-heatmap-cell" data-level="0"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="1"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="2"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="3"></span>` +
+    `<span class="gpi-heatmap-cell" data-level="4"></span>` +
+    `<span>More</span>`;
+  wrapper.appendChild(legend);
+
+  return wrapper;
 }
 
 export function renderContributionDonut(commits, prs, reviews, issues) {
@@ -138,6 +155,7 @@ export function renderWeekdayChart(dayOfWeekCounts, dayNames) {
   container.className = "gpi-weekday-chart";
 
   const max = Math.max(...dayOfWeekCounts);
+  const maxIndex = dayOfWeekCounts.indexOf(max);
 
   for (let i = 0; i < 7; i++) {
     const bar = document.createElement("div");
@@ -145,16 +163,96 @@ export function renderWeekdayChart(dayOfWeekCounts, dayNames) {
 
     const fill = document.createElement("div");
     fill.className = "gpi-weekday-bar";
+    if (i === maxIndex && max > 0) fill.classList.add("gpi-weekday-bar-active");
     fill.style.height = max > 0 ? `${(dayOfWeekCounts[i] / max) * 100}%` : "0%";
     fill.title = `${dayNames[i]}: ${dayOfWeekCounts[i]} contributions`;
 
     const label = document.createElement("div");
     label.className = "gpi-weekday-label";
+    if (i === maxIndex && max > 0) label.classList.add("gpi-weekday-label-active");
     label.textContent = dayNames[i];
 
     bar.appendChild(fill);
     bar.appendChild(label);
     container.appendChild(bar);
+  }
+  return container;
+}
+
+export function computePersonality(commits, prs, reviews, issues) {
+  const total = commits + prs + reviews + issues;
+  if (total === 0) return { label: "New", emoji: "seedling", description: "Just getting started" };
+
+  const commitPct = commits / total;
+  const prPct = prs / total;
+  const reviewPct = reviews / total;
+
+  if (reviewPct >= 0.3) return { label: "Reviewer", emoji: "mag", description: "Focuses on code quality" };
+  if (prPct >= 0.25) return { label: "Collaborator", emoji: "handshake", description: "Drives work through PRs" };
+  if (commitPct >= 0.9) return { label: "Builder", emoji: "hammer", description: "Ships code relentlessly" };
+  if (commitPct >= 0.7 && prPct >= 0.1) return { label: "Maker", emoji: "rocket", description: "Builds and ships features" };
+  return { label: "All-Rounder", emoji: "star", description: "Balanced across all areas" };
+}
+
+export function computeVelocity(calendar) {
+  const weeks = calendar.weeks;
+  if (weeks.length < 8) return { trend: "neutral", ratio: 1 };
+
+  const recent4 = weeks.slice(-4);
+  const prev4 = weeks.slice(-8, -4);
+
+  const recentTotal = recent4.flatMap(w => w.contributionDays).reduce((s, d) => s + d.contributionCount, 0);
+  const prevTotal = prev4.flatMap(w => w.contributionDays).reduce((s, d) => s + d.contributionCount, 0);
+
+  if (prevTotal === 0) return { trend: recentTotal > 0 ? "up" : "neutral", ratio: 1 };
+
+  const ratio = recentTotal / prevTotal;
+  if (ratio >= 1.2) return { trend: "up", ratio };
+  if (ratio <= 0.8) return { trend: "down", ratio };
+  return { trend: "neutral", ratio };
+}
+
+export function computeAvgPerDay(calendar) {
+  const days = calendar.weeks.flatMap(w => w.contributionDays);
+  const activeDays = days.filter(d => d.contributionCount > 0).length;
+  if (activeDays === 0) return 0;
+  const total = days.reduce((s, d) => s + d.contributionCount, 0);
+  return (total / activeDays).toFixed(1);
+}
+
+export function renderRepoTimeline(repos) {
+  const yearCounts = {};
+  for (const repo of repos) {
+    if (!repo.createdAt) continue;
+    const year = new Date(repo.createdAt).getFullYear();
+    yearCounts[year] = (yearCounts[year] || 0) + 1;
+  }
+
+  const years = Object.keys(yearCounts).sort();
+  if (years.length < 2) return null;
+
+  const counts = years.map(y => yearCounts[y]);
+  const max = Math.max(...counts);
+
+  const container = document.createElement("div");
+  container.className = "gpi-timeline";
+
+  for (let i = 0; i < years.length; i++) {
+    const col = document.createElement("div");
+    col.className = "gpi-timeline-col";
+
+    const bar = document.createElement("div");
+    bar.className = "gpi-timeline-bar";
+    bar.style.height = max > 0 ? `${(counts[i] / max) * 100}%` : "0%";
+    bar.title = `${years[i]}: ${counts[i]} repos created`;
+
+    const label = document.createElement("div");
+    label.className = "gpi-timeline-label";
+    label.textContent = years[i].slice(-2);
+
+    col.appendChild(bar);
+    col.appendChild(label);
+    container.appendChild(col);
   }
   return container;
 }
