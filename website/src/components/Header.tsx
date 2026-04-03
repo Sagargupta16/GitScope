@@ -30,6 +30,14 @@ export function Header() {
           >
             Compare
           </Link>
+          <Link
+            to="/leaderboard"
+            className={`text-sm no-underline transition-colors ${
+              pathname === "/leaderboard" ? "text-white" : "text-[var(--color-github-muted)] hover:text-white"
+            }`}
+          >
+            Leaderboard
+          </Link>
           <a
             href="https://chromewebstore.google.com/detail/gitscope/fndaanihifimmlnmkjdmjbbkbdajolff"
             target="_blank"

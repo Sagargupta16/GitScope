@@ -43,6 +43,41 @@ export default {
       });
     }
 
+    // Web OAuth: redirect to GitHub with website callback
+    if (url.pathname === "/web/login") {
+      const redirectUri = `${url.origin}/web/callback`;
+      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20read:org`;
+      return Response.redirect(githubUrl, 302);
+    }
+
+    // Web OAuth: exchange code and redirect to website with token in hash
+    if (url.pathname === "/web/callback") {
+      const code = url.searchParams.get("code");
+      if (!code) {
+        return new Response("Missing code parameter", { status: 400 });
+      }
+
+      const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          client_id: env.CLIENT_ID,
+          client_secret: env.CLIENT_SECRET,
+          code: code,
+          redirect_uri: `${url.origin}/web/callback`
+        })
+      });
+
+      const tokenData = await tokenResponse.json();
+      const siteUrl = "https://sagargupta16.github.io/GitScope/leaderboard";
+
+      if (tokenData.error) {
+        return Response.redirect(`${siteUrl}#error=auth_failed`, 302);
+      }
+
+      return Response.redirect(`${siteUrl}#token=${tokenData.access_token}`, 302);
+    }
+
     return new Response("Not found", { status: 404 });
   }
 };
