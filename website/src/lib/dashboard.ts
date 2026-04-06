@@ -56,6 +56,34 @@ async function fetchAllRepos(token: string): Promise<GitHubRepoRaw[]> {
   return repos;
 }
 
+// GitHub API returns "timestamp" not "date" for traffic entries
+interface GitHubTrafficEntry {
+  timestamp: string;
+  count: number;
+  uniques: number;
+}
+
+interface GitHubTrafficViews {
+  count: number;
+  uniques: number;
+  views: GitHubTrafficEntry[];
+}
+
+interface GitHubTrafficClones {
+  count: number;
+  uniques: number;
+  clones: GitHubTrafficEntry[];
+}
+
+// Normalize GitHub API timestamp to our TrafficDay date format
+function normalizeTrafficEntries(entries: GitHubTrafficEntry[]): TrafficDay[] {
+  return entries.map((e) => ({
+    date: e.timestamp.split("T")[0],
+    count: e.count,
+    uniques: e.uniques,
+  }));
+}
+
 // Fetch traffic for a single repo (requires repo scope)
 async function fetchRepoTraffic(
   owner: string,
@@ -63,12 +91,24 @@ async function fetchRepoTraffic(
   token: string,
 ): Promise<{ views: TrafficData; clones: CloneData; referrers: Referrer[] }> {
   try {
-    const [views, clones, referrers] = await Promise.all([
-      ghFetch<TrafficData>(`/repos/${owner}/${repo}/traffic/views`, token),
-      ghFetch<CloneData>(`/repos/${owner}/${repo}/traffic/clones`, token),
+    const [rawViews, rawClones, referrers] = await Promise.all([
+      ghFetch<GitHubTrafficViews>(`/repos/${owner}/${repo}/traffic/views`, token),
+      ghFetch<GitHubTrafficClones>(`/repos/${owner}/${repo}/traffic/clones`, token),
       ghFetch<Referrer[]>(`/repos/${owner}/${repo}/traffic/popular/referrers`, token),
     ]);
-    return { views, clones, referrers };
+    return {
+      views: {
+        count: rawViews.count,
+        uniques: rawViews.uniques,
+        views: normalizeTrafficEntries(rawViews.views),
+      },
+      clones: {
+        count: rawClones.count,
+        uniques: rawClones.uniques,
+        clones: normalizeTrafficEntries(rawClones.clones),
+      },
+      referrers,
+    };
   } catch {
     // Traffic endpoints return 403 for repos without push access (forks, etc.)
     return {
