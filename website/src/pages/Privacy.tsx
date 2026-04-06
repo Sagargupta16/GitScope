@@ -47,6 +47,21 @@ export function Privacy() {
               to access contribution data via GitHub's GraphQL API. This is read-only access
               and cannot modify any data on your GitHub account.
             </p>
+            <p className="mt-2">
+              The website dashboard additionally requests <code className="bg-[var(--color-github-dark)] px-1 rounded">repo</code> scope
+              to access repository traffic data (views, clones, referrers) via GitHub's REST API.
+              GitScope only reads traffic statistics -- it never creates, modifies, or deletes
+              anything on your GitHub account. The extension does not request this scope.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold mb-2">Dashboard Data</h2>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Dashboard traffic data (views, clones, referrers) is fetched live from GitHub's API and cached in localStorage for 5 minutes.</li>
+              <li>No traffic data is stored on any external server.</li>
+              <li>You can clear cached dashboard data by clicking "Sync Now" or signing out.</li>
+            </ul>
           </section>
 
           <section>

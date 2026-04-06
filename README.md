@@ -5,7 +5,7 @@
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](src/manifest.json)
 [![Website](https://img.shields.io/badge/Website-GitScope-blue)](https://sagargupta16.github.io/GitScope/)
 
-> Browser extension + web tools for GitHub profile insights - contribution streaks, language breakdown, PR stats, profile comparison, and leaderboards.
+> Browser extension + web tools for GitHub profile insights - contribution streaks, language breakdown, PR stats, profile comparison, leaderboards, and a personal analytics dashboard with traffic data.
 
 ## Screenshots
 
@@ -37,9 +37,12 @@
 
 ### Website ([sagargupta16.github.io/GitScope](https://sagargupta16.github.io/GitScope/))
 
+- **Dashboard** - Personal analytics dashboard with traffic data (views, clones, referrers), star/fork trends, and per-repo drill-down. Requires GitHub OAuth with `repo` scope for traffic API access.
+- **Repo Detail** - Per-repository traffic charts, referrer breakdown, and stats (views, clones, stars, forks, issues)
 - **Compare Tool** - Side-by-side profile comparison with up to 17 head-to-head stats (PR merge rate, issue close rate, weekend %, contributed to, organizations, and more)
 - **Leaderboard** - Rank yourself against everyone you follow, sortable by stars, repos, followers, forks, or languages
 - **Leaderboard Caching** - Results cached locally for 10 minutes to avoid rate limits
+- **Dashboard Caching** - Dashboard data cached locally for 5 minutes; manual "Sync Now" button for refresh
 - **Full Stats Mode** - Sign in for contributions, streaks, PRs, personality, velocity, and community stats
 
 ## Installation
@@ -105,9 +108,10 @@ GitScope/
       auth-callback.js       # OAuth callback token capture
   website/                   # Landing page + web tools (React + TS)
     src/
-      pages/                 # Landing, Compare, Leaderboard, Privacy
+      pages/                 # Landing, Compare, Leaderboard, Dashboard, RepoDetail, Privacy
       components/            # Header, Footer
-      lib/                   # GitHub API, analytics, auth utilities
+      components/charts/     # StatCard, TrafficAreaChart, TopReposBarChart, ReferrersChart, Sparkline
+      lib/                   # GitHub API, analytics, auth, dashboard utilities
     vite.config.ts           # Builds to docs/ for GitHub Pages
   worker/                    # Cloudflare Worker (OAuth token exchange)
     index.js                 # Handles extension + web OAuth flows
@@ -130,9 +134,11 @@ GitScope/
 ### Website
 
 - **React 19** + **TypeScript** - Component-based UI
-- **Vite** - Build tool with HMR
+- **Vite 8** - Build tool with HMR
 - **Tailwind CSS v4** - Utility-first styling
 - **React Router v7** - Client-side routing
+- **Recharts 3** - React charting library for dashboard traffic/star charts
+- **date-fns 4** - Date formatting and manipulation
 - **GitHub REST + GraphQL APIs** - Hybrid auth (basic stats without login, full stats with)
 
 ### Infrastructure
@@ -145,7 +151,8 @@ GitScope/
 
 - Token stored locally (Chrome storage for extension, localStorage for website)
 - Client secret stored server-side on Cloudflare Worker
-- API responses cached locally (extension: 5 min, leaderboard: 10 min)
+- API responses cached locally (extension: 5 min, leaderboard: 10 min, dashboard: 5 min)
+- Dashboard requests `repo` scope for traffic API access (read-only -- never writes to repos)
 - No analytics, no tracking, no telemetry
 - Source code is fully open and auditable
 

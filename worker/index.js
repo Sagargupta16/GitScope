@@ -12,7 +12,7 @@ export default {
 
     // Website login: redirect to GitHub OAuth with state=web to flag web flow
     if (url.pathname === "/web/login") {
-      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user%20read:org&state=web`;
+      const githubUrl = `https://github.com/login/oauth/authorize?client_id=${env.CLIENT_ID}&redirect_uri=${env.REDIRECT_URI}&scope=read:user%20read:org%20repo&state=web`;
       return Response.redirect(githubUrl, 302);
     }
 

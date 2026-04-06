@@ -25,7 +25,8 @@ Thanks for your interest in contributing!
 ## Project Structure
 
 - `src/` - Chrome extension (vanilla JS, esbuild)
-- `website/` - Landing page + web tools (React 19, TypeScript, Vite, Tailwind CSS v4)
+- `website/` - Landing page + web tools (React 19, TypeScript, Vite, Tailwind CSS v4, Recharts 3)
+- `website/src/components/charts/` - Reusable chart components for the dashboard (Recharts)
 - `worker/` - Cloudflare Worker for OAuth (JS)
 - `docs/` - Built website output (auto-generated, do not edit directly)
 
@@ -41,8 +42,10 @@ Thanks for your interest in contributing!
 ### Website
 
 - Run `cd website && pnpm dev` for hot-reload dev server
-- Pages are in `website/src/pages/`
+- Pages are in `website/src/pages/` (Landing, Compare, Leaderboard, Dashboard, RepoDetail, Privacy)
+- Chart components are in `website/src/components/charts/` (StatCard, TrafficAreaChart, TopReposBarChart, ReferrersChart, Sparkline)
 - GitHub API logic is in `website/src/lib/github.ts`
+- Dashboard API logic (traffic, repos) is in `website/src/lib/dashboard.ts`
 - Analytics functions (ported from extension) are in `website/src/lib/analytics.ts`
 
 ### Worker
