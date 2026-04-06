@@ -38,6 +38,14 @@ export function Header() {
           >
             Leaderboard
           </Link>
+          <Link
+            to="/dashboard"
+            className={`text-sm no-underline transition-colors ${
+              pathname.startsWith("/dashboard") ? "text-white" : "text-[var(--color-github-muted)] hover:text-white"
+            }`}
+          >
+            Dashboard
+          </Link>
           <a
             href="https://chromewebstore.google.com/detail/gitscope/fndaanihifimmlnmkjdmjbbkbdajolff"
             target="_blank"

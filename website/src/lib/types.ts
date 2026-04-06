@@ -74,3 +74,67 @@ export interface CompareResult {
   right: ProfileStats | FullProfileStats;
   isFullData: boolean;
 }
+
+// Dashboard types
+
+export interface TrafficDay {
+  date: string; // YYYY-MM-DD
+  count: number;
+  uniques: number;
+}
+
+export interface TrafficData {
+  count: number;
+  uniques: number;
+  views: TrafficDay[];
+}
+
+export interface CloneData {
+  count: number;
+  uniques: number;
+  clones: TrafficDay[];
+}
+
+export interface Referrer {
+  referrer: string;
+  count: number;
+  uniques: number;
+}
+
+export interface RepoTraffic {
+  repo: string;
+  views: TrafficData;
+  clones: CloneData;
+  referrers: Referrer[];
+}
+
+export interface DashboardRepo {
+  name: string;
+  html_url: string;
+  stargazers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  language: string | null;
+  fork: boolean;
+  archived: boolean;
+  description: string | null;
+  updated_at: string;
+  totalViews: number;
+  totalClones: number;
+  uniqueVisitors: number;
+}
+
+export interface DashboardData {
+  user: GitHubUser;
+  repos: DashboardRepo[];
+  totalViews: number;
+  totalUniqueVisitors: number;
+  totalClones: number;
+  totalUniqueCloners: number;
+  totalStars: number;
+  totalForks: number;
+  viewsTimeline: TrafficDay[];
+  clonesTimeline: TrafficDay[];
+  referrers: Referrer[];
+  lastSynced: string;
+}

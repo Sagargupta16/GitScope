@@ -20,7 +20,13 @@ The extension and website access the following data from GitHub's API:
 - Repositories contributed to (count only)
 - Organization membership (count only)
 
-This data is fetched from GitHub's GraphQL API (`api.github.com`) using your authenticated session and is only used to render the insights dashboard on profile pages.
+**Dashboard only** (requires `repo` scope):
+
+- Repository traffic views (daily counts and unique visitors, last 14 days)
+- Repository traffic clones (daily counts and unique cloners, last 14 days)
+- Repository traffic referrers (traffic sources)
+
+This data is fetched from GitHub's REST and GraphQL APIs (`api.github.com`) using your authenticated session and is only used to render insights in the extension and website dashboard. GitScope only reads data -- it never creates, modifies, or deletes anything on your GitHub account.
 
 ## Authentication
 
@@ -33,7 +39,7 @@ This data is fetched from GitHub's GraphQL API (`api.github.com`) using your aut
 
 - **OAuth token**: Stored in `chrome.storage.sync` (extension) or `localStorage` (website). Local to your browser only.
 - **Extension cache**: Profile data is cached in `chrome.storage.local` for 5 minutes to reduce API calls. Cache is automatically cleared after expiry.
-- **Website cache**: Leaderboard data is cached in `localStorage` for 10 minutes. Cleared on sign-out or manual refresh.
+- **Website cache**: Leaderboard data is cached in `localStorage` for 10 minutes. Dashboard data is cached in `localStorage` for 5 minutes. Cleared on sign-out or manual refresh.
 - No data is stored on any external server
 
 ## Network Requests
@@ -51,6 +57,7 @@ No other network requests are made. No analytics, telemetry, or tracking service
 |---|---|
 | `storage` | Store OAuth token and cache API responses locally |
 | `api.github.com` (host permission) | Fetch profile data from GitHub's API |
+| `repo` scope (website dashboard only) | Read-only access to repository traffic data (views, clones, referrers). Required by GitHub's Traffic API. Not requested by the extension. |
 
 ## Third-Party Services
 

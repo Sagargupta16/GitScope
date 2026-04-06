@@ -7,16 +7,19 @@ Guidance for Claude Code when working in this repository.
 GitScope is a Chrome extension + website that adds contribution insights to GitHub profiles. Three main components:
 
 1. **Chrome Extension** (`src/`) - Injects a dashboard into GitHub profile sidebars. Vanilla JS, esbuild bundler, Manifest V3.
-2. **Website** (`website/`) - Landing page, profile comparison tool, and leaderboard. React 19 + TypeScript + Vite + Tailwind CSS v4.
-3. **Cloudflare Worker** (`worker/`) - OAuth token exchange proxy. Handles both extension and website auth flows using `state` parameter.
+2. **Website** (`website/`) - Landing page, profile comparison, leaderboard, and personal analytics dashboard. React 19 + TypeScript + Vite + Tailwind CSS v4 + Recharts 3.
+3. **Cloudflare Worker** (`worker/`) - OAuth token exchange proxy. Handles both extension and website auth flows using `state` parameter. Website flow requests `repo` scope for traffic API.
 
 ## Architecture
 
 - Extension uses GitHub GraphQL API via a background service worker (avoids CORS)
 - Website uses GitHub REST API (no auth) for basic stats, GraphQL API (with auth) for full stats
+- Dashboard uses GitHub REST API with `repo` scope for traffic data (views, clones, referrers)
 - OAuth flow: GitHub -> Cloudflare Worker (`/callback`) -> extension (postMessage) or website (hash redirect)
+- Extension OAuth requests `read:user read:org`, website OAuth requests `read:user read:org repo`
 - Extension stores tokens in `chrome.storage.sync`, website uses `localStorage`
 - API responses cached in `chrome.storage.local` (extension) with 5-min TTL
+- Dashboard data cached in `localStorage` with 5-min TTL; traffic fetches batched 5 repos at a time
 
 ## Common Commands
 
@@ -41,11 +44,14 @@ npx wrangler deploy      # Deploy to Cloudflare
 ## Key Patterns
 
 - Extension charts are pure CSS/SVG in `src/js/charts.js` - no external charting libraries
+- Website dashboard charts use Recharts 3 (`website/src/components/charts/`)
 - Website ports the analytics functions from `charts.js` into `website/src/lib/analytics.ts`
+- Dashboard API layer in `website/src/lib/dashboard.ts` handles traffic fetching with batched requests
 - GitHub theme support via CSS custom properties (`--fgColor-default`, `--bgColor-muted`, etc.)
 - Dark theme detection: `[data-color-mode="dark"]`, `[data-dark-theme="dark"]`, `@media (prefers-color-scheme: dark)`
 - All extension DOM is prefixed with `gpi-` classes to avoid CSS conflicts
 - Leaderboard data cached in `localStorage` with 10-min TTL to avoid GitHub API rate limits
+- Dashboard data cached in `localStorage` with 5-min TTL; "Sync Now" button for manual refresh
 - Extension GraphQL query fetches PR states (merged/open/closed), issue states, repos contributed to, and org count in a single request
 
 ## Deployment

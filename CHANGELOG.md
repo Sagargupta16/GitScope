@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-04-06
+
+### Added
+
+#### Website
+- **Dashboard** (`/dashboard`) - Personal analytics dashboard showing:
+  - Profile overview with avatar, name, repos, followers, account age
+  - Stat cards: total views, clones, stars, forks (with unique visitor/cloner counts)
+  - Traffic area charts: daily views and clones over 14 days (total + unique)
+  - Top repos bar chart by views, stars, or clones
+  - Aggregated referrer chart across all repos
+  - Sortable repository list with per-repo views, clones, stars, forks
+  - "Sync Now" button for manual data refresh
+  - 5-minute localStorage cache to avoid redundant API calls
+- **Repo Detail** (`/dashboard/repo/:name`) - Per-repository analytics:
+  - Repo stats: stars, forks, open issues, language
+  - Traffic stats: total/unique views, total/unique clones, avg views/day
+  - Views and clones area charts (14-day history)
+  - Referrer chart and detailed referrer table
+- **Chart components** (Recharts 3):
+  - `TrafficAreaChart` - Dual-area chart for total + unique traffic
+  - `TopReposBarChart` - Horizontal bar chart for top repos
+  - `ReferrersChart` - Horizontal bar chart for traffic sources
+  - `StatCard` - Reusable stat card with label, value, sub-value, trend
+  - `Sparkline` - Inline mini chart for trend indicators
+- Dashboard nav link in header (highlights for all `/dashboard/*` routes)
+
+#### Worker
+- `/web/login` now requests `repo` scope for traffic API access (extension `/login` unchanged at `read:user read:org`)
+
+### Dependencies
+- Added `recharts@3.8.1` (React charting library)
+- Added `date-fns@4.1.0` (date formatting)
+
 ## [1.3.0] - 2026-04-03
 
 ### Added
@@ -108,6 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Privacy policy (PRIVACY.md)
 - Manifest V3
 
+[2.0.0]: https://github.com/Sagargupta16/GitScope/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/Sagargupta16/GitScope/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Sagargupta16/GitScope/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Sagargupta16/GitScope/compare/v1.0.0...v1.1.0
