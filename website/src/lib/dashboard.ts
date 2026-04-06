@@ -1,13 +1,17 @@
 import type {
   GitHubUser,
+  FullProfileStats,
   DashboardData,
   DashboardRepo,
   TrafficData,
   CloneData,
   Referrer,
   TrafficDay,
-  RepoTraffic,
+  RepoDetailData,
+  WeeklyCommitActivity,
+  ParticipationData,
 } from "./types";
+import { fetchFullProfile } from "./github";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -158,14 +162,58 @@ function mergeReferrers(allReferrers: Referrer[][]): Referrer[] {
     .sort((a, b) => b.count - a.count);
 }
 
-// Fetch traffic for a single repo (public API for RepoDetail page)
+// Fetch full repo detail with traffic + commit activity + participation
 export async function fetchRepoDetail(
   owner: string,
   repo: string,
   token: string,
-): Promise<RepoTraffic> {
-  const { views, clones, referrers } = await fetchRepoTraffic(owner, repo, token);
-  return { repo, views, clones, referrers };
+): Promise<RepoDetailData> {
+  const [traffic, infoRes, commitActivityRes, participationRes] = await Promise.all([
+    fetchRepoTraffic(owner, repo, token),
+    fetch(`${GITHUB_API}/repos/${owner}/${repo}`, { headers: headers(token) }),
+    fetch(`${GITHUB_API}/repos/${owner}/${repo}/stats/commit_activity`, { headers: headers(token) }),
+    fetch(`${GITHUB_API}/repos/${owner}/${repo}/stats/participation`, { headers: headers(token) }),
+  ]);
+
+  const info = infoRes.ok ? await infoRes.json() : null;
+  const commitActivity: WeeklyCommitActivity[] = commitActivityRes.ok
+    ? await commitActivityRes.json().then((d: unknown) => Array.isArray(d) ? d : [])
+    : [];
+  const participation: ParticipationData | null = participationRes.ok
+    ? await participationRes.json()
+    : null;
+
+  return {
+    traffic: { repo, ...traffic },
+    info: info
+      ? {
+          stargazers_count: info.stargazers_count,
+          forks_count: info.forks_count,
+          open_issues_count: info.open_issues_count,
+          description: info.description,
+          html_url: info.html_url,
+          language: info.language,
+          size: info.size,
+          license: info.license?.spdx_id ?? null,
+          topics: info.topics ?? [],
+          created_at: info.created_at,
+          pushed_at: info.pushed_at,
+          has_pages: info.has_pages,
+          has_wiki: info.has_wiki,
+          default_branch: info.default_branch,
+          watchers_count: info.watchers_count,
+          subscribers_count: info.subscribers_count,
+        }
+      : {
+          stargazers_count: 0, forks_count: 0, open_issues_count: 0,
+          description: null, html_url: `https://github.com/${owner}/${repo}`,
+          language: null, size: 0, license: null, topics: [],
+          created_at: "", pushed_at: "", has_pages: false, has_wiki: false,
+          default_branch: "main", watchers_count: 0, subscribers_count: 0,
+        },
+    commitActivity,
+    participation,
+  };
 }
 
 // Main dashboard data fetch
@@ -175,6 +223,14 @@ export async function fetchDashboardData(
 ): Promise<DashboardData> {
   onProgress?.("Fetching profile...");
   const user = await ghFetch<GitHubUser>("/user", token);
+
+  onProgress?.("Fetching profile stats...");
+  let profile: FullProfileStats | null = null;
+  try {
+    profile = await fetchFullProfile(user.login, token);
+  } catch {
+    // GraphQL may fail for some users, continue without full stats
+  }
 
   onProgress?.("Fetching repositories...");
   const rawRepos = await fetchAllRepos(token);
@@ -252,5 +308,6 @@ export async function fetchDashboardData(
     clonesTimeline,
     referrers,
     lastSynced: new Date().toISOString(),
+    profile,
   };
 }

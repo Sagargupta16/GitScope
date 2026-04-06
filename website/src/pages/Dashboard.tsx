@@ -16,6 +16,7 @@ import { StatCard } from "../components/charts/StatCard";
 import { TrafficAreaChart } from "../components/charts/TrafficAreaChart";
 import { TopReposBarChart } from "../components/charts/TopReposBarChart";
 import { ReferrersChart } from "../components/charts/ReferrersChart";
+import { LanguagesBar } from "../components/charts/LanguagesBar";
 
 type RepoSortKey = "totalViews" | "stargazers_count" | "totalClones" | "forks_count";
 
@@ -275,7 +276,77 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Stat cards */}
+        {/* Profile stats (from GraphQL) */}
+        {data.profile && (
+          <div className="rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)] p-4 mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold">{data.profile.personality.label}</span>
+                <span className="text-xs text-[var(--color-github-muted)]">{data.profile.personality.description}</span>
+              </div>
+              {data.profile.velocity.trend !== "neutral" && (
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  data.profile.velocity.trend === "up"
+                    ? "text-green-400 bg-green-950/40"
+                    : "text-red-400 bg-red-950/40"
+                }`}>
+                  {data.profile.velocity.trend === "up" ? "\u25B2" : "\u25BC"} velocity ({data.profile.velocity.ratio.toFixed(1)}x)
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+              <div className="text-center">
+                <div className="text-lg font-bold">{formatNumber(data.profile.totalContributions)}</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">This Year</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{data.profile.currentStreak}d</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Streak</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{data.profile.longestStreak}d</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Best Streak</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{formatNumber(data.profile.mergedPRs)}</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Merged PRs</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{data.profile.prMergeRate}%</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">PR Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{data.profile.issueCloseRate}%</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Issues Closed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{data.profile.avgPerDay}</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Avg/Day</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold">{data.profile.weekendPct}%</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Weekends</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{formatNumber(data.profile.reposContributedTo)} repos contributed to</span>
+              {data.profile.organizations > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{data.profile.organizations} organizations</span>
+              )}
+              <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{data.profile.openPRs} open PRs</span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">{data.profile.closedIssues + data.profile.openIssues} total issues</span>
+            </div>
+          </div>
+        )}
+
+        {/* Languages */}
+        {data.profile && data.profile.topLanguages.length > 0 && (
+          <div className="mb-8">
+            <LanguagesBar languages={data.profile.topLanguages} totalCount={data.profile.languageCount} />
+          </div>
+        )}
+
+        {/* Traffic stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
             label="Views (14d)"

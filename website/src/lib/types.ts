@@ -137,4 +137,44 @@ export interface DashboardData {
   clonesTimeline: TrafficDay[];
   referrers: Referrer[];
   lastSynced: string;
+  // Profile stats (from GraphQL)
+  profile: FullProfileStats | null;
+}
+
+// Repo detail: commit activity (52 weeks from GitHub Stats API)
+export interface WeeklyCommitActivity {
+  week: number; // unix timestamp
+  total: number;
+  days: number[]; // [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
+}
+
+// Repo detail: participation (owner vs all, 52 weeks)
+export interface ParticipationData {
+  all: number[];
+  owner: number[];
+}
+
+// Extended repo detail data
+export interface RepoDetailData {
+  traffic: RepoTraffic;
+  info: {
+    stargazers_count: number;
+    forks_count: number;
+    open_issues_count: number;
+    description: string | null;
+    html_url: string;
+    language: string | null;
+    size: number;
+    license: string | null;
+    topics: string[];
+    created_at: string;
+    pushed_at: string;
+    has_pages: boolean;
+    has_wiki: boolean;
+    default_branch: string;
+    watchers_count: number;
+    subscribers_count: number;
+  };
+  commitActivity: WeeklyCommitActivity[];
+  participation: ParticipationData | null;
 }

@@ -3,24 +3,25 @@ import { useParams, Link } from "react-router-dom";
 import { getStoredToken, getStoredLogin, getLoginUrl } from "../lib/auth";
 import { fetchRepoDetail } from "../lib/dashboard";
 import { formatNumber } from "../lib/analytics";
-import type { RepoTraffic } from "../lib/types";
+import type { RepoDetailData } from "../lib/types";
 import { StatCard } from "../components/charts/StatCard";
 import { TrafficAreaChart } from "../components/charts/TrafficAreaChart";
 import { ReferrersChart } from "../components/charts/ReferrersChart";
+import { CommitActivityChart } from "../components/charts/CommitActivityChart";
+import { ParticipationChart } from "../components/charts/ParticipationChart";
+import { format } from "date-fns";
+
+function formatSize(kb: number): string {
+  if (kb >= 1024 * 1024) return `${(kb / (1024 * 1024)).toFixed(1)} GB`;
+  if (kb >= 1024) return `${(kb / 1024).toFixed(1)} MB`;
+  return `${kb} KB`;
+}
 
 export function RepoDetail() {
   const { name } = useParams<{ name: string }>();
   const token = getStoredToken();
   const login = getStoredLogin();
-  const [data, setData] = useState<RepoTraffic | null>(null);
-  const [repoInfo, setRepoInfo] = useState<{
-    stargazers_count: number;
-    forks_count: number;
-    open_issues_count: number;
-    description: string | null;
-    html_url: string;
-    language: string | null;
-  } | null>(null);
+  const [data, setData] = useState<RepoDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const loadedRef = useRef(false);
@@ -29,36 +30,10 @@ export function RepoDetail() {
     if (!token || !login || !name || loadedRef.current) return;
     loadedRef.current = true;
 
-    async function load() {
-      try {
-        const [traffic, infoRes] = await Promise.all([
-          fetchRepoDetail(login!, name!, token!),
-          fetch(`https://api.github.com/repos/${login}/${name}`, {
-            headers: { Authorization: `bearer ${token}` },
-          }),
-        ]);
-
-        setData(traffic);
-
-        if (infoRes.ok) {
-          const info = await infoRes.json();
-          setRepoInfo({
-            stargazers_count: info.stargazers_count,
-            forks_count: info.forks_count,
-            open_issues_count: info.open_issues_count,
-            description: info.description,
-            html_url: info.html_url,
-            language: info.language,
-          });
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load repo data");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
+    fetchRepoDetail(login, name, token)
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load repo data"))
+      .finally(() => setLoading(false));
   }, [token, login, name]);
 
   if (!token) {
@@ -91,12 +66,12 @@ export function RepoDetail() {
     );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
       <section className="py-20 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <div className="text-red-400 mb-6 p-4 rounded-lg border border-red-900 bg-red-950/30">
-            {error}
+            {error ?? "Failed to load data"}
           </div>
           <Link
             to="/dashboard"
@@ -109,13 +84,17 @@ export function RepoDetail() {
     );
   }
 
-  if (!data) return null;
+  const { info, traffic, commitActivity, participation } = data;
+  const createdDate = info.created_at ? format(new Date(info.created_at), "MMM d, yyyy") : null;
+  const pushedDate = info.pushed_at ? format(new Date(info.pushed_at), "MMM d, yyyy") : null;
+  const totalCommits = participation ? participation.owner.reduce((s, n) => s + n, 0) : null;
+  const totalAllCommits = participation ? participation.all.reduce((s, n) => s + n, 0) : null;
 
   return (
     <section className="py-8 px-6">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
           <div>
             <Link
               to="/dashboard"
@@ -124,82 +103,146 @@ export function RepoDetail() {
               &larr; Back to Dashboard
             </Link>
             <h1 className="text-2xl font-bold mt-1">{name}</h1>
-            {repoInfo?.description && (
-              <p className="text-sm text-[var(--color-github-muted)] mt-1">{repoInfo.description}</p>
+            {info.description && (
+              <p className="text-sm text-[var(--color-github-muted)] mt-1">{info.description}</p>
             )}
           </div>
-          {repoInfo && (
-            <a
-              href={repoInfo.html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-[var(--color-github-muted)] hover:text-white no-underline transition-colors"
-            >
-              View on GitHub &rarr;
-            </a>
-          )}
+          <a
+            href={info.html_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-[var(--color-github-muted)] hover:text-white no-underline transition-colors"
+          >
+            View on GitHub &rarr;
+          </a>
         </div>
 
-        {/* Stats */}
-        {repoInfo && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <StatCard label="Stars" value={formatNumber(repoInfo.stargazers_count)} />
-            <StatCard label="Forks" value={formatNumber(repoInfo.forks_count)} />
-            <StatCard label="Open Issues" value={formatNumber(repoInfo.open_issues_count)} />
-            {repoInfo.language && <StatCard label="Language" value={repoInfo.language} />}
+        {/* Topics */}
+        {info.topics.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {info.topics.map((topic) => (
+              <span
+                key={topic}
+                className="text-xs px-2.5 py-0.5 rounded-full bg-[var(--color-brand)]/15 text-[var(--color-brand)] border border-[var(--color-brand)]/30"
+              >
+                {topic}
+              </span>
+            ))}
           </div>
         )}
+
+        {/* Repo metadata */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+          <StatCard label="Stars" value={formatNumber(info.stargazers_count)} />
+          <StatCard label="Forks" value={formatNumber(info.forks_count)} />
+          <StatCard label="Open Issues" value={formatNumber(info.open_issues_count)} />
+          {info.language && <StatCard label="Language" value={info.language} />}
+          <StatCard label="Size" value={formatSize(info.size)} />
+          {info.license && <StatCard label="License" value={info.license} />}
+        </div>
+
+        {/* Repo info pills */}
+        <div className="flex flex-wrap gap-2 mb-8">
+          {createdDate && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+              Created {createdDate}
+            </span>
+          )}
+          {pushedDate && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+              Last push {pushedDate}
+            </span>
+          )}
+          <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+            {info.default_branch} branch
+          </span>
+          {info.watchers_count > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+              {info.watchers_count} watchers
+            </span>
+          )}
+          {info.subscribers_count > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+              {info.subscribers_count} subscribers
+            </span>
+          )}
+          {info.has_pages && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+              GitHub Pages
+            </span>
+          )}
+          {info.has_wiki && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+              Wiki
+            </span>
+          )}
+          {totalCommits !== null && (
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
+              {totalCommits} your commits (of {totalAllCommits} total)
+            </span>
+          )}
+        </div>
 
         {/* Traffic stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
             label="Total Views"
-            value={formatNumber(data.views.count)}
-            subValue={`${formatNumber(data.views.uniques)} unique`}
+            value={formatNumber(traffic.views.count)}
+            subValue={`${formatNumber(traffic.views.uniques)} unique`}
           />
           <StatCard
             label="Total Clones"
-            value={formatNumber(data.clones.count)}
-            subValue={`${formatNumber(data.clones.uniques)} unique`}
+            value={formatNumber(traffic.clones.count)}
+            subValue={`${formatNumber(traffic.clones.uniques)} unique`}
           />
           <StatCard
             label="Avg Views/Day"
             value={
-              data.views.views.length > 0
-                ? (data.views.count / data.views.views.length).toFixed(1)
+              traffic.views.views.length > 0
+                ? (traffic.views.count / traffic.views.views.length).toFixed(1)
                 : "0"
             }
           />
           <StatCard
             label="Referrers"
-            value={data.referrers.length}
-            subValue={data.referrers[0]?.referrer ? `Top: ${data.referrers[0].referrer}` : undefined}
+            value={traffic.referrers.length}
+            subValue={traffic.referrers[0]?.referrer ? `Top: ${traffic.referrers[0].referrer}` : undefined}
           />
         </div>
 
-        {/* Charts */}
-        <div className="space-y-4 mb-8">
-          <TrafficAreaChart data={data.views.views} title="Views (last 14 days)" />
+        {/* Traffic charts (14 days) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+          <TrafficAreaChart data={traffic.views.views} title="Views (last 14 days)" />
           <TrafficAreaChart
-            data={data.clones.clones}
+            data={traffic.clones.clones}
             title="Clones (last 14 days)"
             color="#da3633"
             secondaryColor="#f0883e"
           />
         </div>
 
+        {/* Commit activity (52 weeks) + Participation */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+          {commitActivity.length > 0 && (
+            <CommitActivityChart data={commitActivity} />
+          )}
+          {participation && (
+            <ParticipationChart data={participation} />
+          )}
+        </div>
+
         {/* Referrers */}
         <div className="mb-8">
-          <ReferrersChart referrers={data.referrers} title="Traffic Sources" />
+          <ReferrersChart referrers={traffic.referrers} title="Traffic Sources" />
         </div>
 
         {/* Referrer table */}
-        {data.referrers.length > 0 && (
+        {traffic.referrers.length > 0 && (
           <div className="rounded-lg border border-[var(--color-github-border)] overflow-hidden">
             <div className="px-4 py-3 bg-[var(--color-github-darker)] border-b border-[var(--color-github-border)]">
               <h2 className="text-sm font-semibold">Referrer Details</h2>
             </div>
-            {data.referrers.map((r) => (
+            {traffic.referrers.map((r) => (
               <div
                 key={r.referrer}
                 className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-github-border)] last:border-0 bg-[var(--color-github-dark)]"
