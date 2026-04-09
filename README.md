@@ -1,5 +1,11 @@
 # GitScope
 
+![GitHub stars](https://img.shields.io/github/stars/Sagargupta16/GitScope?style=flat-square)
+![GitHub forks](https://img.shields.io/github/forks/Sagargupta16/GitScope?style=flat-square)
+![License](https://img.shields.io/github/license/Sagargupta16/GitScope?style=flat-square)
+![Last Commit](https://img.shields.io/github/last-commit/Sagargupta16/GitScope?style=flat-square)
+![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-install-blue?style=flat-square&logo=googlechrome)
+
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/fndaanihifimmlnmkjdmjbbkbdajolff?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/gitscope/fndaanihifimmlnmkjdmjbbkbdajolff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](src/manifest.json)
@@ -181,6 +187,15 @@ npx wrangler deploy  # Deploy to Cloudflare
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## More Projects
+
+| Project | Description |
+|---------|-------------|
+| [claude-cost-optimizer](https://github.com/Sagargupta16/claude-cost-optimizer) | Save 30-60% on Claude Code costs - proven strategies and benchmarks |
+| [InstagramLikesLeaderboard](https://github.com/Sagargupta16/InstagramLikesLeaderboard) | Browser tool showing who likes your Instagram posts the most |
+| [Financial Dashboard](https://github.com/Sagargupta16/Financial-Dashboard) | Modern React financial dashboard with analytics and data visualization |
+| [LeetCode Rating Predictor](https://github.com/Sagargupta16/LeetCode_Rating_Predictor) | Full-stack ML-powered LeetCode contest rating predictor |
 
 ## License
 
