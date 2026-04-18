@@ -19,3 +19,9 @@ Thumbs.db
 .env
 *.pem
 worker/.wrangler/
+
+# Added for consistency
+.env.local
+.env.*.local
+*.log
+.next/
