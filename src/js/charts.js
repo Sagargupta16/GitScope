@@ -250,7 +250,7 @@ export function renderRepoTimeline(repos) {
     yearCounts[year] = (yearCounts[year] || 0) + 1;
   }
 
-  const years = Object.keys(yearCounts).sort();
+  const years = Object.keys(yearCounts).sort((a, b) => a.localeCompare(b));
   if (years.length < 2) return null;
 
   const counts = years.map(y => yearCounts[y]);
