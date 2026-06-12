@@ -1,10 +1,8 @@
 # GitScope
 
-![GitHub stars](https://img.shields.io/github/stars/Sagargupta16/GitScope?style=flat-square)
-![GitHub forks](https://img.shields.io/github/forks/Sagargupta16/GitScope?style=flat-square)
-![License](https://img.shields.io/github/license/Sagargupta16/GitScope?style=flat-square)
-![Last Commit](https://img.shields.io/github/last-commit/Sagargupta16/GitScope?style=flat-square)
-![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-install-blue?style=flat-square&logo=googlechrome)
+![GitHub stars](https://img.shields.io/github/stars/Sagargupta16/GitScope?style=flat-square&cacheSeconds=86400)
+![GitHub forks](https://img.shields.io/github/forks/Sagargupta16/GitScope?style=flat-square&cacheSeconds=86400)
+![Last Commit](https://img.shields.io/github/last-commit/Sagargupta16/GitScope?style=flat-square&cacheSeconds=86400)
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/fndaanihifimmlnmkjdmjbbkbdajolff?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/gitscope/fndaanihifimmlnmkjdmjbbkbdajolff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
