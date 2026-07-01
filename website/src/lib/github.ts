@@ -21,6 +21,12 @@ export async function fetchPublicProfile(username: string): Promise<ProfileStats
   ]);
 
   if (!userRes.ok) throw new Error(`User "${username}" not found`);
+  if (!reposRes.ok) {
+    if (reposRes.status === 403 && reposRes.headers.get("x-ratelimit-remaining") === "0") {
+      throw new Error("GitHub API rate limit exceeded. Please wait a few minutes or sign in.");
+    }
+    throw new Error(`GitHub API error: ${reposRes.status}`);
+  }
 
   const user: GitHubUser = await userRes.json();
   const repos: GitHubRepo[] = await reposRes.json();
