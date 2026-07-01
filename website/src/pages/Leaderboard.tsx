@@ -68,7 +68,7 @@ async function fetchUserWithStats(username: string, token: string): Promise<Lead
     }),
   ]);
 
-  if (!userRes.ok) return null;
+  if (!userRes.ok || !reposRes.ok) return null;
 
   const user = await userRes.json();
   const repos: { stargazers_count: number; forks_count: number; language: string | null; fork: boolean; archived: boolean }[] = await reposRes.json();
@@ -103,6 +103,7 @@ async function fetchFollowing(token: string): Promise<string[]> {
     const res = await fetch(`https://api.github.com/user/following?per_page=100&page=${page}`, {
       headers: { Authorization: `bearer ${token}` },
     });
+    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
     const data: { login: string }[] = await res.json();
     if (data.length === 0) break;
     logins.push(...data.map((u) => u.login));
