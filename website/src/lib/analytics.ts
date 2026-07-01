@@ -15,11 +15,13 @@ interface Calendar {
 
 export function computeStreaks(calendar: Calendar) {
   const days = calendar.weeks.flatMap((w) => w.contributionDays);
-  const today = new Date().toISOString().split("T")[0];
 
+  // Current streak: skip any trailing zero-contribution days (today/future
+  // edge cells the calendar may include) before counting back to the first gap.
   let currentStreak = 0;
-  for (let i = days.length - 1; i >= 0; i--) {
-    if (days[i].date === today && days[i].contributionCount === 0) continue;
+  let i = days.length - 1;
+  while (i >= 0 && days[i].contributionCount === 0) i--;
+  for (; i >= 0; i--) {
     if (days[i].contributionCount > 0) currentStreak++;
     else break;
   }
