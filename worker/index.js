@@ -89,11 +89,6 @@ function renderPage(title, message, status, token) {
   ${safeToken ? `<script>
     var t = ${safeToken};
     document.body.setAttribute("data-gpi-token", t);
-    try {
-      if (window.opener) {
-        window.opener.postMessage({ type: "GPI_AUTH_TOKEN", token: t }, "*");
-      }
-    } catch(e) {}
     setTimeout(function() { window.close(); }, 2000);
   </script>` : ""}
 </body>
