@@ -2,15 +2,36 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # release-please maintains a release PR that bumps package.json + manifest.json
+  # and the changelog from conventional commits. Merging that PR tags the release
+  # and flips release_created, which gates the build + publish jobs below.
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   build-and-release:
     runs-on: ubuntu-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -23,18 +44,18 @@ jobs:
       - run: npm run build
 
       - name: Create zip artifact
-        run: cd dist && zip -r ../gitscope-${{ github.ref_name }}.zip .
+        run: cd dist && zip -r ../gitscope-${{ needs.release-please.outputs.tag_name }}.zip .
 
-      - name: Create GitHub Release
+      - name: Attach build to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: gitscope-${{ github.ref_name }}.zip
-          generate_release_notes: true
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: gitscope-${{ needs.release-please.outputs.tag_name }}.zip
 
   publish-to-chrome:
     runs-on: ubuntu-latest
-    needs: build-and-release
-    if: ${{ !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+    needs: [release-please, build-and-release]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     steps:
       - uses: actions/checkout@v6
 

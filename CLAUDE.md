@@ -66,7 +66,7 @@ npx wrangler deploy      # Deploy to Cloudflare
 
 ## Deployment
 
-- **Extension**: Push a `v*` tag -> GitHub Actions builds + publishes to Chrome Web Store
+- **Extension**: Fully automated via release-please. Conventional commits on `main` drive an auto-maintained release PR (bumps `package.json` + `src/manifest.json` + CHANGELOG). Merging that PR tags the release and publishes to the Chrome Web Store. Never bump versions or push `v*` tags by hand.
 - **Website**: Push to `main` (paths: `website/**`, `docs/**`) -> GitHub Actions builds React app + deploys to GitHub Pages
 - **Worker**: Manual deploy via `cd worker && npx wrangler deploy`
 
