@@ -25,6 +25,8 @@ async function showSignedIn(token) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
+
   const token = await getSavedToken();
   if (token) await showSignedIn(token);
 
