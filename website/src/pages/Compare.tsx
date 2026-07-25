@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { fetchPublicProfile, fetchFullProfile } from "../lib/github";
 import { formatNumber } from "../lib/analytics";
 import { getStoredToken, getLoginUrl } from "../lib/auth";

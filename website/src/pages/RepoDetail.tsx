@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link } from "react-router";
 import { getStoredToken, getStoredLogin, getLoginUrl } from "../lib/auth";
 import { fetchRepoDetail } from "../lib/dashboard";
 import { formatNumber } from "../lib/analytics";

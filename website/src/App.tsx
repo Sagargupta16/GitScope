@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router";
 import { Landing } from "./pages/Landing";
 import { Compare } from "./pages/Compare";
 import { Leaderboard } from "./pages/Leaderboard";
