@@ -1,6 +1,6 @@
 {
   "name": "gitscope",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Browser extension that adds contribution insights to any GitHub profile",
   "scripts": {
