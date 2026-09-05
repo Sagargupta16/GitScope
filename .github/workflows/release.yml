@@ -70,7 +70,30 @@ jobs:
       - name: Create zip
         run: cd dist && zip -r ../gitscope.zip .
 
+      # Non-blocking on purpose, and this is the one step here that talks to an
+      # external account we cannot re-authorise from CI.
+      #
+      # The v1.2.1 run (2026-09-03) failed with `HTTPError: Response code 400`
+      # during "Setting up auth". All four CHROME_* secrets exist, so this is a
+      # rejected credential rather than a missing one -- Chrome Web Store refresh
+      # tokens get revoked (unused for months, OAuth client rotated, or the
+      # consent screen changed). Nothing in the repo can fix that.
+      #
+      # Everything that matters for a release already succeeded by this point:
+      # release-please tagged it, and build-and-release attached the zip to the
+      # GitHub Release. Failing the whole workflow on the store upload turned a
+      # successful release red and buried that fact, so the upload now reports
+      # loudly and lets the run pass.
+      #
+      # TO RESTORE BLOCKING BEHAVIOUR FOR PRODUCTION:
+      #   1. Regenerate the refresh token via the Chrome Web Store API OAuth
+      #      flow and update the CHROME_REFRESH_TOKEN secret.
+      #   2. Confirm a release publishes end to end.
+      #   3. Delete the `continue-on-error` line below and the reporting step
+      #      that follows it. That is the whole revert.
       - name: Upload to Chrome Web Store
+        id: chrome-upload
+        continue-on-error: true
         uses: mnao305/chrome-extension-upload@v6.0.0
         with:
           file-path: gitscope.zip
@@ -79,3 +102,34 @@ jobs:
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
           publish: true
+
+      # Keeps a skipped publish visible. Without this the run is green and the
+      # store silently never receives the build.
+      - name: Report store upload outcome
+        if: always()
+        env:
+          OUTCOME: ${{ steps.chrome-upload.outcome }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [ "${OUTCOME}" = "success" ]; then
+            echo "Published ${TAG} to the Chrome Web Store."
+            echo "Published \`${TAG}\` to the Chrome Web Store." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "::warning::Chrome Web Store upload did not succeed (${OUTCOME})." \
+            "The GitHub Release for ${TAG} is complete and the zip is attached," \
+            "but the store still needs the build. Most likely CHROME_REFRESH_TOKEN" \
+            "has been revoked and needs regenerating."
+          {
+            echo "### Chrome Web Store upload skipped"
+            echo
+            echo "Release \`${TAG}\` is tagged and the zip is attached to the GitHub Release."
+            echo "The store upload reported \`${OUTCOME}\`, so **the extension was not published**."
+            echo
+            echo "Most likely cause: \`CHROME_REFRESH_TOKEN\` was revoked. Regenerate it, or"
+            echo "upload \`gitscope.zip\` by hand from the"
+            echo "[Developer Dashboard](https://chrome.google.com/webstore/devconsole)."
+          } >> "$GITHUB_STEP_SUMMARY"
