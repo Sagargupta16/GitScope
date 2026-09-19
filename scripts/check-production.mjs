@@ -20,10 +20,11 @@ console.log("OAuth service: healthy; state validation protocol and basic permiss
 
 if (!process.argv.includes("--auth-only")) {
   const release = await (await get(`${site}release.json?check=${Date.now()}`)).json();
-  // release.json is fetched, so treat its contents as untrusted before comparing or logging it.
-  assert.match(String(release.sha), /^[0-9a-f]{40}$/, "release.json does not contain a commit SHA.");
+  // release.json is fetched, so compare and log the matched SHA rather than the raw response.
+  const sha = /^[0-9a-f]{40}$/.exec(String(release.sha))?.[0];
+  assert.ok(sha, "release.json does not contain a commit SHA.");
   const expected = process.env.EXPECTED_SHA;
-  if (expected) assert.equal(release.sha, expected, "The live website is not the expected release.");
+  if (expected) assert.equal(sha, expected, "The live website is not the expected release.");
   const html = await (await get(`${site}?check=${Date.now()}`)).text();
   const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1]);
   assert.ok(assets.length >= 2, "Missing website entry assets.");
@@ -34,5 +35,5 @@ if (!process.argv.includes("--auth-only")) {
   }
   const fallback = await (await get(`${site}404.html`)).text();
   assert.ok(fallback.includes('id="root"'), "Missing SPA fallback.");
-  console.log(`Website: release ${release.sha}; entry assets and SPA fallback verified.`);
+  console.log(`Website: release ${sha}; entry assets and SPA fallback verified.`);
 }

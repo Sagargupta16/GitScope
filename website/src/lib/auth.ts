@@ -31,8 +31,10 @@ function stored(): StoredAuth | null {
 // credential is a bug or a poisoning attempt: refuse it instead of persisting it.
 const CREDENTIAL = /^[\w.~-]{1,255}$/;
 const SCOPE = /^[\w:.~-]{1,64}$/;
-function credentialShape(token: string, login: string, scopes: string[]): boolean {
-  return CREDENTIAL.test(token) && CREDENTIAL.test(login) && scopes.every((scope) => SCOPE.test(scope));
+// Returns the matched value itself, so what gets persisted is the validated
+// substring rather than the caller's string.
+function allowed(value: unknown, pattern: RegExp): string | null {
+  return typeof value === "string" ? pattern.exec(value)?.[0] ?? null : null;
 }
 function clearCachedData() {
   for (const storage of [localStorage, sessionStorage]) {
@@ -48,20 +50,23 @@ export function getStoredToken(): string | null { return snapshot.token || store
 export function getStoredLogin(): string | null { return snapshot.login || stored()?.login || null; }
 export function getAuthSessionId(): string { return sessionId; }
 export function storeAuth(token: string, login: string, scopes: string[] = []) {
-  if (!credentialShape(token, login, scopes)) {
+  const safeToken = allowed(token, CREDENTIAL);
+  const safeLogin = allowed(login, CREDENTIAL);
+  const safeScopes = scopes.map((scope) => allowed(scope, SCOPE)).filter((scope): scope is string => scope !== null);
+  if (!safeToken || !safeLogin || safeScopes.length !== scopes.length) {
     clearAuth(false);
     update({ error: "GitHub returned an unreadable sign-in. Please try again.", retryable: true });
     return;
   }
   const previous = stored();
-  const sameSession = previous?.token === token && previous.login === login &&
-    [...previous.scopes].sort().join(",") === [...scopes].sort().join(",");
+  const sameSession = previous?.token === safeToken && previous.login === safeLogin &&
+    [...previous.scopes].sort().join(",") === [...safeScopes].sort().join(",");
   generation++;
   pendingVerification = null;
   if (!sameSession) clearCachedData();
   sessionId = sameSession && previous.sessionId ? previous.sessionId : crypto.randomUUID();
-  try { sessionStorage.setItem(AUTH_KEY, JSON.stringify({ token, login, scopes, sessionId })); } catch { /* Current tab still works without persistence. */ }
-  update({ token, login, scopes, loading: false, error: null, retryable: false });
+  try { sessionStorage.setItem(AUTH_KEY, JSON.stringify({ token: safeToken, login: safeLogin, scopes: safeScopes, sessionId })); } catch { /* Current tab still works without persistence. */ }
+  update({ token: safeToken, login: safeLogin, scopes: safeScopes, loading: false, error: null, retryable: false });
 }
 export function clearAuth(broadcast = true) {
   generation++;
