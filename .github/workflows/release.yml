@@ -82,13 +82,22 @@ jobs:
     needs: [release-please, build-and-release]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
       - uses: actions/download-artifact@v4
         with:
           name: release-extension
 
-      # A release is not fully published when the store rejects the upload.
+      # The action's publish call returned HTTP 400 on 1.2.1 and 1.2.2 even though
+      # both reached the store, so its exit code cannot decide the outcome. Let it
+      # run, then ask the store what it actually holds in the next step.
       - name: Upload to Chrome Web Store
         id: chrome-upload
+        continue-on-error: true
         uses: mnao305/chrome-extension-upload@v6.0.0
         with:
           file-path: gitscope-${{ needs.release-please.outputs.tag_name }}.zip
@@ -98,29 +107,46 @@ jobs:
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
           publish: true
 
-      # Store review can remain pending after the publish request succeeds.
-      - name: Report store upload outcome
+      # This is what makes the store step blocking: it fails when the store does
+      # not hold the released version, rather than trusting the upload's status.
+      - name: Verify the store holds this release
+        id: chrome-verify
+        env:
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: node scripts/check-store-version.mjs "${TAG#v}"
+
+      - name: Report store outcome
         if: always()
         env:
-          OUTCOME: ${{ steps.chrome-upload.outcome }}
+          UPLOAD: ${{ steps.chrome-upload.outcome }}
+          VERIFY: ${{ steps.chrome-verify.outcome }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           set -euo pipefail
 
-          if [ "${OUTCOME}" = "success" ]; then
-            echo "Submitted ${TAG} to the Chrome Web Store."
-            echo "Submitted \`${TAG}\` to the Chrome Web Store. Confirm the public listing version after store review." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${VERIFY}" = "success" ]; then
+            echo "The Chrome Web Store holds ${TAG}."
+            {
+              echo "### Chrome Web Store has \`${TAG}\`"
+              echo
+              echo "Upload step reported \`${UPLOAD}\`; the store was then queried directly and holds this version."
+              echo "The public listing updates once store review and rollout complete, which can take hours."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          echo "::error::Chrome Web Store submission did not succeed (${OUTCOME}). Check the upload step for the cause."
+          echo "::error::The Chrome Web Store does not hold ${TAG}."
           {
-            echo "### Chrome Web Store submission failed"
+            echo "### Chrome Web Store does not have \`${TAG}\`"
             echo
             echo "Release \`${TAG}\` is tagged and the zip is attached to the GitHub Release."
-            echo "The store upload reported \`${OUTCOME}\`, so **the extension was not published**."
+            echo "Upload reported \`${UPLOAD}\` and the store check reported \`${VERIFY}\`."
             echo
-            echo "Check the upload error and release credentials, or upload the exact release zip from the"
+            echo "Check the release credentials, or upload the exact release zip from the"
             echo "[Developer Dashboard](https://chrome.google.com/webstore/devconsole)."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
