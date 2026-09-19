@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import type { TrafficDay } from "../../lib/types";
 
@@ -14,14 +15,15 @@ export function Sparkline({
   height = 24,
   width = 80,
 }: SparklineProps) {
+  const gradient = useId();
   if (data.length < 2) return null;
 
   return (
-    <div style={{ width, height }} className="inline-block">
+    <div role="img" aria-label={`Traffic from ${data[0].date} to ${data[data.length - 1].date}: ${data.map((day) => `${day.date}: ${day.count}`).join(", ")}`} style={{ width, height }} className="inline-block">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+        <AreaChart accessibilityLayer={false} data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
           <defs>
-            <linearGradient id={`spark-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`${gradient}-spark`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={color} stopOpacity={0.4} />
               <stop offset="95%" stopColor={color} stopOpacity={0} />
             </linearGradient>
@@ -30,7 +32,7 @@ export function Sparkline({
             type="monotone"
             dataKey="count"
             stroke={color}
-            fill={`url(#spark-${color.replace("#", "")})`}
+            fill={`url(#${gradient}-spark)`}
             strokeWidth={1.5}
             dot={false}
           />

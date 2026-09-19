@@ -5,8 +5,12 @@
   "description": "Browser extension that adds contribution insights to any GitHub profile",
   "scripts": {
     "build": "node build.js",
+    "build:worker": "wrangler deploy --dry-run --config worker/wrangler.toml --outdir .artifacts/worker",
+    "test": "node --test tests/*.test.cjs",
+    "typecheck": "node website/node_modules/typescript/bin/tsc --noEmit -p website/tsconfig.json",
+    "check:auth": "node scripts/check-production.mjs --auth-only",
+    "check:production": "node scripts/check-production.mjs",
     "watch": "node build.js --watch",
-    "clean": "rm -rf dist",
     "version": "node scripts/bump-version.js && git add src/manifest.json"
   },
   "repository": {
@@ -16,6 +20,7 @@
   "author": "Sagar Gupta",
   "license": "MIT",
   "devDependencies": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "wrangler": "^4.135.0"
   }
 }

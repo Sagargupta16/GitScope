@@ -1,82 +1,40 @@
 # Privacy Policy
 
-**GitScope** - Chrome Extension
+GitScope extension and website. Updated September 19, 2026.
 
-Last updated: March 28, 2026
+## GitHub data
 
-## Data Collection
+GitScope reads profile information, contribution calendars, repository metadata, pull requests, issues, organizations, and following lists to display analytics. Traffic analytics also reads views, clones, referrers, and repository activity. Repository permissions can include private repository metadata.
 
-This extension does **not** collect, store, or transmit any personal data to the developer or any third party.
-
-## What Data Is Accessed
-
-The extension and website access the following data from GitHub's API:
-
-- Public profile information (name, username, avatar, follower/following counts)
-- Public repository data (names, stars, languages, fork counts)
-- Contribution calendar data (contribution counts by date)
-- Pull request counts (merged, open, closed)
-- Issue counts (open, closed)
-- Repositories contributed to (count only)
-- Organization membership (count only)
-
-**Dashboard only** (requires `repo` scope):
-
-- Repository traffic views (daily counts and unique visitors, last 14 days)
-- Repository traffic clones (daily counts and unique cloners, last 14 days)
-- Repository traffic referrers (traffic sources)
-
-This data is fetched from GitHub's REST and GraphQL APIs (`api.github.com`) using your authenticated session and is only used to render insights in the extension and website dashboard. GitScope only reads data -- it never creates, modifies, or deletes anything on your GitHub account.
+GitScope makes read requests to GitHub. It does not create, modify, or delete repositories. The website's optional classic OAuth `repo` scope nevertheless grants broad repository permissions, including write capability. Basic website sign-in does not explicitly request this scope; enabling traffic analytics requests it separately. GitHub may retain permissions you previously granted to the same OAuth app.
 
 ## Authentication
 
-- Authentication is handled via GitHub's standard OAuth 2.0 flow
-- The OAuth token exchange is processed by a Cloudflare Worker (`gpi-auth.sg85207.workers.dev`)
-- The Cloudflare Worker only exchanges the authorization code for an access token - it does not store, log, or retain any tokens or user data
-- Your access token is stored locally in your browser via `chrome.storage.sync`
+A Cloudflare Worker exchanges the GitHub authorization code using a server-side client secret. It validates a signed, short-lived, browser-bound state cookie. The website also validates the pending login in its initiating tab. Token responses are marked non-cacheable.
 
-## Data Storage
+The Worker has no token database and the application does not intentionally log tokens. GitHub and Cloudflare process requests under their own infrastructure and privacy policies.
 
-- **OAuth token**: Stored in `chrome.storage.sync` (extension) or `localStorage` (website). Local to your browser only.
-- **Extension cache**: Profile data is cached in `chrome.storage.local` for 5 minutes to reduce API calls. Cache is automatically cleared after expiry.
-- **Website cache**: Leaderboard data is cached in `localStorage` for 10 minutes. Dashboard data is cached in `localStorage` for 5 minutes. Cleared on sign-out or manual refresh.
-- No data is stored on any external server
+## Browser storage
 
-## Network Requests
+- Extension tokens are stored in `chrome.storage.local`, on the current device. A legacy token in `chrome.storage.sync` is migrated to local storage and removed from sync when used.
+- Website tokens are stored in tab `sessionStorage`, not persistent `localStorage`. Existing localStorage sign-ins are validated and migrated. Closing the tab normally ends this session, though browser session restore behavior can vary.
+- Extension profile caches expire after five minutes and expired entries are removed when accessed.
+- Website dashboard and leaderboard caches use account and sign-in session identifiers, with five-minute and ten-minute freshness periods respectively. They may contain private repository metadata. They are stored in localStorage on this device.
+- Sign-out clears GitScope credentials and caches. Website sign-out also notifies other open GitScope tabs on the same origin.
+- The GitHub Pages website shares its origin with other sites hosted at `sagargupta16.github.io`; URL paths do not provide a browser security boundary. Do not treat browser storage as a secure vault.
 
-The extension only communicates with:
+## Network requests
 
-1. `api.github.com` - To fetch profile data via GitHub's GraphQL API
-2. `gpi-auth.sg85207.workers.dev` - OAuth token exchange only (during sign-in)
+The extension uses `api.github.com` for data, `github.com` for profile pages and authorization, and `gpi-auth.sg85207.workers.dev` for token exchange. Profile images can load from GitHub's avatar service. The website also loads its public screenshot from `raw.githubusercontent.com`.
 
-No other network requests are made. No analytics, telemetry, or tracking services are used.
+There is no application analytics, advertising tracker, or telemetry integration. GitScope does not maintain a server-side analytics history or sell data.
 
-## Permissions
+## Removing access and data
 
-| Permission | Purpose |
-|---|---|
-| `storage` | Store OAuth token and cache API responses locally |
-| `api.github.com` (host permission) | Fetch profile data from GitHub's API |
-| `repo` scope (website dashboard only) | Read-only access to repository traffic data (views, clones, referrers). Required by GitHub's Traffic API. Not requested by the extension. |
+Sign out to remove GitScope's stored session and caches. Clear site data or uninstall the extension to remove remaining browser storage. To revoke the GitHub token itself, remove GitScope from GitHub Settings > Applications > Authorized OAuth Apps; signing out locally does not revoke GitHub authorization.
 
-## Third-Party Services
+## Source and contact
 
-- **GitHub API** (api.github.com) - Used to fetch public profile and contribution data. Subject to [GitHub's Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
-- **Cloudflare Workers** (gpi-auth.sg85207.workers.dev) - Used solely for OAuth token exchange during sign-in. No data is logged or retained.
+Source: https://github.com/Sagargupta16/GitScope
 
-## Data Deletion
-
-To remove all data stored by this extension:
-
-1. Click the extension icon and click **Sign Out** (clears the OAuth token)
-2. Uninstall the extension from `chrome://extensions` (clears all stored data including cache)
-
-## Open Source
-
-This extension is fully open source. You can audit the complete source code at:
-https://github.com/Sagargupta16/GitScope
-
-## Contact
-
-For privacy questions or concerns, open an issue at:
-https://github.com/Sagargupta16/GitScope/issues
+Questions: https://github.com/Sagargupta16/GitScope/issues

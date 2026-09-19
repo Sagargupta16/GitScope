@@ -89,6 +89,13 @@ export function buildInsightsPanel(data, viewerStats = null) {
   // Build panel
   const panel = el("div", "gpi-panel");
   panel.id = "gpi-panel";
+  panel.setAttribute("data-profile", user.login.toLowerCase());
+  panel.setAttribute("role", "region");
+  panel.setAttribute("aria-label", `GitScope insights for ${user.login}`);
+  const loaded = el("span", "gpi-sr-only");
+  loaded.setAttribute("role", "status");
+  loaded.textContent = `Insights loaded for ${user.login}`;
+  panel.appendChild(loaded);
 
   // Header
   const joinYear = new Date(user.createdAt).getFullYear();
@@ -101,7 +108,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
   const statsGrid = el("div", "gpi-stats-grid");
   const stats = [
     { label: "Stars", value: formatNumber(totalStars), raw: totalStars.toLocaleString() },
-    { label: "This Year", value: formatNumber(calendar.totalContributions), raw: calendar.totalContributions.toLocaleString() },
+    { label: "Last 365 Days", value: formatNumber(calendar.totalContributions), raw: `${calendar.totalContributions.toLocaleString()} contributions across 365 UTC dates including today` },
     { label: "Streak", value: `${streaks.currentStreak}d`, raw: `${streaks.currentStreak} consecutive days` },
     { label: "Best Streak", value: `${streaks.longestStreak}d`, raw: `${streaks.longestStreak} consecutive days` },
     { label: "Merged PRs", value: formatNumber(mergedPRs), raw: mergedPRs.toLocaleString() },
@@ -116,6 +123,8 @@ export function buildInsightsPanel(data, viewerStats = null) {
       `<div class="gpi-stat-label">${stat.label}</div>`
     );
     card.title = `${stat.label}: ${stat.raw}`;
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", card.title);
     statsGrid.appendChild(card);
   }
   panel.appendChild(statsGrid);
@@ -130,8 +139,8 @@ export function buildInsightsPanel(data, viewerStats = null) {
     `<span class="gpi-personality-desc">${personality.description}</span>` +
     `</div>` +
     `<div class="gpi-quick-stats">` +
-    `<span class="gpi-quick-stat" title="Average contributions per active day">${avgPerDay}/day</span>` +
-    `<span class="gpi-quick-stat ${velocityClass}" title="Velocity: last 4 weeks vs previous 4 weeks">${velocityArrow} Velocity</span>` +
+    `<span class="gpi-quick-stat" title="Average contributions per active day over the last 365 days">${avgPerDay}/active day</span>` +
+    `<span class="gpi-quick-stat ${velocityClass}" tabindex="0" aria-label="Velocity ${velocity.trend}: last 28 complete UTC days vs previous 28" title="Last 28 complete UTC days vs previous 28; today excluded">${velocityArrow} Velocity</span>` +
     `<span class="gpi-quick-stat" title="${originalCount} original, ${forkCount} forked">${originalCount}/${forkCount} own/fork</span>` +
     `<span class="gpi-quick-stat" title="${weekendPct}% of contributions on weekends">${weekendPct}% weekends</span>` +
     `<span class="gpi-quick-stat" title="Codes in ${languageCount} languages">${languageCount} langs</span>` +
@@ -235,7 +244,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
   // Busiest day + extra stats
   const footerStats = [];
   if (streaks.busiestDay.contributionCount > 0) {
-    const bDate = new Date(streaks.busiestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const bDate = new Date(streaks.busiestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
     footerStats.push(`Busiest day: <strong>${bDate}</strong> (${streaks.busiestDay.contributionCount.toLocaleString()})`);
   }
   if (user.starredRepositories?.totalCount > 0) {
@@ -256,7 +265,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
     const compareGrid = el("div", "gpi-compare-grid");
 
     const comparisons = [
-      { label: "Contributions", theirs: calendar.totalContributions, yours: viewerStats.totalContributions },
+      { label: "Last 365 Days", theirs: calendar.totalContributions, yours: viewerStats.totalContributions },
       { label: "Stars", theirs: totalStars, yours: viewerStats.totalStars },
       { label: "Repos", theirs: user.repositories.totalCount, yours: viewerStats.totalRepos },
       { label: "Merged PRs", theirs: mergedPRs, yours: viewerStats.mergedPRs },
@@ -280,25 +289,33 @@ export function buildInsightsPanel(data, viewerStats = null) {
   return panel;
 }
 
+export function getDashboardTarget() {
+  const card = document.querySelector(".Layout-sidebar .h-card");
+  if (card) return { parent: card.parentNode, before: card.nextSibling };
+  const sidebar = document.querySelector(".Layout-sidebar");
+  if (sidebar) return { parent: sidebar, before: null };
+  const person = document.querySelector('[itemtype="http://schema.org/Person"]');
+  return person?.parentNode ? { parent: person.parentNode, before: person.nextSibling } : null;
+}
+
+export function removeDashboard() {
+  for (const container of document.querySelectorAll(".gpi-container")) container.remove();
+}
+
 export function injectDashboard(panel) {
-  const sidebar = document.querySelector(".Layout-sidebar .h-card") ||
-    document.querySelector(".Layout-sidebar") ||
-    document.querySelector('[itemtype="http://schema.org/Person"]');
-
-  if (!sidebar) return;
-
+  removeDashboard();
+  const target = getDashboardTarget();
+  if (!target) return false;
   const container = el("div", "gpi-container");
   container.appendChild(panel);
-  sidebar.parentNode.insertBefore(container, sidebar.nextSibling);
+  target.parent.insertBefore(container, target.before);
+  return true;
 }
 
 export function showTokenPrompt() {
-  const sidebar = document.querySelector(".Layout-sidebar .h-card") ||
-    document.querySelector(".Layout-sidebar");
-  if (!sidebar) return;
-
   const prompt = el("div", "gpi-panel gpi-token-prompt");
   prompt.id = "gpi-panel";
+  prompt.setAttribute("role", "status");
   prompt.innerHTML =
     `<div class="gpi-header"><span class="gpi-title">GitScope</span></div>` +
     `<div class="gpi-section">` +
@@ -311,21 +328,13 @@ export function showTokenPrompt() {
     `</ul>` +
     `</div>`;
 
-  const container = el("div", "gpi-container");
-  container.appendChild(prompt);
-  sidebar.parentNode.insertBefore(container, sidebar.nextSibling);
+  return injectDashboard(prompt);
 }
 
 export function showErrorState(username) {
-  const existing = document.getElementById("gpi-panel")?.parentElement;
-  if (existing) existing.remove();
-
-  const sidebar = document.querySelector(".Layout-sidebar .h-card") ||
-    document.querySelector(".Layout-sidebar");
-  if (!sidebar) return;
-
   const panel = el("div", "gpi-panel gpi-error");
   panel.id = "gpi-panel";
+  panel.setAttribute("role", "alert");
   panel.innerHTML =
     `<div class="gpi-header"><span class="gpi-title">GitScope</span></div>` +
     `<div class="gpi-section gpi-error-section">` +
@@ -333,18 +342,14 @@ export function showErrorState(username) {
     `<button class="gpi-retry-btn" id="gpi-retry">Retry</button>` +
     `</div>`;
 
-  const container = el("div", "gpi-container");
-  container.appendChild(panel);
-  sidebar.parentNode.insertBefore(container, sidebar.nextSibling);
+  return injectDashboard(panel);
 }
 
 export function showLoadingSkeleton() {
-  const sidebar = document.querySelector(".Layout-sidebar .h-card") ||
-    document.querySelector(".Layout-sidebar");
-  if (!sidebar) return;
-
   const skeleton = el("div", "gpi-panel gpi-skeleton");
   skeleton.id = "gpi-panel";
+  skeleton.setAttribute("role", "status");
+  skeleton.setAttribute("aria-label", "Loading GitScope insights");
   skeleton.innerHTML =
     `<div class="gpi-header"><span class="gpi-title">GitScope</span><span class="gpi-badge">Loading...</span></div>` +
     `<div class="gpi-stats-grid">` +
@@ -352,7 +357,5 @@ export function showLoadingSkeleton() {
     `</div>` +
     `<div class="gpi-section"><div class="gpi-skeleton-line" style="width:100%;height:8px;border-radius:4px"></div></div>`;
 
-  const container = el("div", "gpi-container");
-  container.appendChild(skeleton);
-  sidebar.parentNode.insertBefore(container, sidebar.nextSibling);
+  return injectDashboard(skeleton);
 }

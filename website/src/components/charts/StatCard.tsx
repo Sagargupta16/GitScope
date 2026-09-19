@@ -12,9 +12,10 @@ export function StatCard({ label, value, subValue, trend }: StatCardProps) {
         {label}
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold">{value}</span>
+        <span className="text-2xl font-bold tabular-nums break-words min-w-0">{value}</span>
         {trend && trend !== "neutral" && (
           <span
+            aria-label={trend === "up" ? "Increasing" : "Decreasing"}
             className={`text-xs ${trend === "up" ? "text-green-400" : "text-red-400"}`}
           >
             {trend === "up" ? "\u25B2" : "\u25BC"}

@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build output (regenerated via npm run build)
 dist/
@@ -19,6 +20,8 @@ Thumbs.db
 .env
 *.pem
 worker/.wrangler/
+.wrangler/
+.artifacts/
 
 # Added for consistency
 .env.local

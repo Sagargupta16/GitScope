@@ -1,3 +1,5 @@
+import { useId } from "react";
+import { ChartData } from "./ChartData";
 import {
   AreaChart,
   Area,
@@ -16,8 +18,9 @@ interface ParticipationChartProps {
 
 export function ParticipationChart({
   data,
-  title = "Weekly Commits (last year)",
+  title = "Weekly Commits (last 52 weeks)",
 }: ParticipationChartProps) {
+  const gradient = useId();
   const formatted = data.all.map((total, i) => ({
     week: `W${i + 1}`,
     all: total,
@@ -25,11 +28,11 @@ export function ParticipationChart({
     others: total - (data.owner[i] ?? 0),
   }));
 
-  const hasData = formatted.some((w) => w.all > 0);
+  const hasData = formatted.length > 0;
 
   if (!hasData) {
     return (
-      <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+      <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
         <h3 className="text-sm font-semibold mb-4">{title}</h3>
         <div className="text-center text-[var(--color-github-muted)] py-8 text-sm">
           No participation data available
@@ -39,16 +42,16 @@ export function ParticipationChart({
   }
 
   return (
-    <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+    <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
       <h3 className="text-sm font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={180}>
-        <AreaChart data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <AreaChart accessibilityLayer data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
           <defs>
-            <linearGradient id="grad-owner" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`${gradient}-owner`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#238636" stopOpacity={0.3} />
               <stop offset="95%" stopColor="#238636" stopOpacity={0} />
             </linearGradient>
-            <linearGradient id="grad-others" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`${gradient}-others`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#388bfd" stopOpacity={0.3} />
               <stop offset="95%" stopColor="#388bfd" stopOpacity={0} />
             </linearGradient>
@@ -79,9 +82,9 @@ export function ParticipationChart({
           <Area
             type="monotone"
             dataKey="owner"
-            name="You"
+            name="Repository owner"
             stroke="#238636"
-            fill="url(#grad-owner)"
+            fill={`url(#${gradient}-owner)`}
             strokeWidth={2}
             stackId="1"
           />
@@ -90,12 +93,14 @@ export function ParticipationChart({
             dataKey="others"
             name="Others"
             stroke="#388bfd"
-            fill="url(#grad-others)"
+            fill={`url(#${gradient}-others)`}
             strokeWidth={2}
             stackId="1"
           />
         </AreaChart>
       </ResponsiveContainer>
+      <p className="text-xs text-[var(--color-github-muted)] mt-2">Weeks run from oldest to newest. Owner refers to the repository owner.</p>
+      <ChartData title={title} columns={["Week", "All commits", "Repository owner", "Others"]} rows={formatted.map((week) => [week.week, week.all, week.owner, week.others])} />
     </div>
   );
 }

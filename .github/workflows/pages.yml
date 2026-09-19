@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: [website/**, docs/**]
+    paths: [website/**, docs/**, .github/workflows/pages.yml, scripts/check-production.mjs]
   workflow_dispatch:
 
 concurrency:
@@ -36,8 +36,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: website
 
+      - run: npm ci
+
+      - run: npm test
+
       - run: pnpm build
         working-directory: website
+
+      - name: Verify compatible authentication service
+        run: node scripts/check-production.mjs --auth-only
 
       - uses: actions/configure-pages@v6
 

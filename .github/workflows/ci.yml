@@ -4,8 +4,30 @@ on:
     branches: [main]
   pull_request:
 jobs:
-  build:
-    uses: Sagargupta16/shared-workflows/.github/workflows/node-ci.yml@main
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: pnpm --dir website install --frozen-lockfile
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run build:worker
+      - run: pnpm --dir website build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-extension
+          path: dist
   security:
     uses: Sagargupta16/shared-workflows/.github/workflows/security-scan.yml@main
     permissions:

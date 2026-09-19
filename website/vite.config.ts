@@ -1,15 +1,21 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { copyFileSync } from "node:fs";
+import { copyFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
 function spa404(): Plugin {
+  let outDir = "";
   return {
     name: "spa-404",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
     closeBundle() {
-      const outDir = resolve(__dirname, "../docs");
       copyFileSync(resolve(outDir, "index.html"), resolve(outDir, "404.html"));
+      const sha = process.env.GITHUB_SHA || execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+      writeFileSync(resolve(outDir, "release.json"), JSON.stringify({ sha }));
     },
   };
 }

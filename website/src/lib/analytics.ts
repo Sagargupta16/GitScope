@@ -2,39 +2,59 @@
 
 import type { Personality, Velocity } from "./types";
 
-interface ContributionDay {
+export interface ContributionDay {
   contributionCount: number;
   date: string;
   weekday: number;
 }
 
-interface Calendar {
+export interface Calendar {
   totalContributions: number;
   weeks: { contributionDays: ContributionDay[] }[];
 }
 
-export function computeStreaks(calendar: Calendar) {
-  const days = calendar.weeks.flatMap((w) => w.contributionDays);
+const DAY_MS = 86_400_000;
 
-  // Current streak: skip any trailing zero-contribution days (today/future
-  // edge cells the calendar may include) before counting back to the first gap.
+function calendarDays(calendar: Calendar, now = new Date()): ContributionDay[] {
+  const today = now.toISOString().slice(0, 10);
+  const days = new Map<string, ContributionDay>();
+  for (const day of calendar.weeks.flatMap((w) => w.contributionDays)) {
+    const time = Date.parse(day.date);
+    if (day.date > today || !/^\d{4}-\d{2}-\d{2}$/.test(day.date) || !Number.isFinite(time)
+      || new Date(time).toISOString().slice(0, 10) !== day.date
+      || !Number.isFinite(day.contributionCount) || day.contributionCount < 0) continue;
+    const previous = days.get(day.date);
+    if (!previous || day.contributionCount > previous.contributionCount) {
+      days.set(day.date, { ...day, weekday: new Date(time).getUTCDay() });
+    }
+  }
+  return [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function computeStreaks(calendar: Calendar, now = new Date()) {
+  const days = calendarDays(calendar, now);
+  const counts = new Map(days.map((day) => [Date.parse(day.date), day.contributionCount]));
+  const today = Date.parse(now.toISOString().slice(0, 10));
   let currentStreak = 0;
-  let i = days.length - 1;
-  while (i >= 0 && days[i].contributionCount === 0) i--;
-  for (; i >= 0; i--) {
-    if (days[i].contributionCount > 0) currentStreak++;
-    else break;
+  let cursor = (counts.get(today) ?? 0) > 0 ? today : today - DAY_MS;
+  while ((counts.get(cursor) ?? 0) > 0) {
+    currentStreak++;
+    cursor -= DAY_MS;
   }
 
   let longestStreak = 0;
   let temp = 0;
+  let previousDate = -Infinity;
   for (const day of days) {
+    const date = Date.parse(day.date);
+    if (date - previousDate !== DAY_MS) temp = 0;
     if (day.contributionCount > 0) {
       temp++;
       longestStreak = Math.max(longestStreak, temp);
     } else {
       temp = 0;
     }
+    previousDate = date;
   }
 
   return { currentStreak, longestStreak };
@@ -60,15 +80,17 @@ export function computePersonality(
   return { label: "All-Rounder", description: "Balanced across all areas" };
 }
 
-export function computeVelocity(calendar: Calendar): Velocity {
-  const weeks = calendar.weeks;
-  if (weeks.length < 8) return { trend: "neutral", ratio: 1 };
-
-  const recent4 = weeks.slice(-4);
-  const prev4 = weeks.slice(-8, -4);
-
-  const recentTotal = recent4.flatMap((w) => w.contributionDays).reduce((s, d) => s + d.contributionCount, 0);
-  const prevTotal = prev4.flatMap((w) => w.contributionDays).reduce((s, d) => s + d.contributionCount, 0);
+export function computeVelocity(calendar: Calendar, now = new Date()): Velocity {
+  const counts = new Map(calendarDays(calendar, now).map((day) => [Date.parse(day.date), day.contributionCount]));
+  const today = Date.parse(now.toISOString().slice(0, 10));
+  let recentTotal = 0;
+  let prevTotal = 0;
+  for (let offset = 1; offset <= 56; offset++) {
+    const count = counts.get(today - offset * DAY_MS);
+    if (count === undefined) return { trend: "neutral", ratio: 1 };
+    if (offset <= 28) recentTotal += count;
+    else prevTotal += count;
+  }
 
   if (prevTotal === 0) return { trend: recentTotal > 0 ? "up" : "neutral", ratio: 1 };
 
@@ -79,7 +101,7 @@ export function computeVelocity(calendar: Calendar): Velocity {
 }
 
 export function computeAvgPerDay(calendar: Calendar): number {
-  const days = calendar.weeks.flatMap((w) => w.contributionDays);
+  const days = calendarDays(calendar);
   const activeDays = days.filter((d) => d.contributionCount > 0).length;
   if (activeDays === 0) return 0;
   const total = days.reduce((s, d) => s + d.contributionCount, 0);
@@ -87,7 +109,7 @@ export function computeAvgPerDay(calendar: Calendar): number {
 }
 
 export function computeWeekendPct(calendar: Calendar): number {
-  const days = calendar.weeks.flatMap((w) => w.contributionDays);
+  const days = calendarDays(calendar);
   const total = days.reduce((s, d) => s + d.contributionCount, 0);
   if (total === 0) return 0;
   const weekend = days

@@ -1,3 +1,5 @@
+import { useId } from "react";
+import { ChartData } from "./ChartData";
 import {
   AreaChart,
   Area,
@@ -15,6 +17,8 @@ interface TrafficAreaChartProps {
   title: string;
   color?: string;
   secondaryColor?: string;
+  uniqueLabel?: string;
+  unavailable?: boolean;
 }
 
 export function TrafficAreaChart({
@@ -22,13 +26,16 @@ export function TrafficAreaChart({
   title,
   color = "#238636",
   secondaryColor = "#388bfd",
+  uniqueLabel = "Unique",
+  unavailable = false,
 }: TrafficAreaChartProps) {
-  if (data.length === 0) {
+  const gradient = useId();
+  if (data.length === 0 || unavailable) {
     return (
-      <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+      <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
         <h3 className="text-sm font-semibold mb-4">{title}</h3>
         <div className="text-center text-[var(--color-github-muted)] py-8 text-sm">
-          No data available
+          {unavailable ? "Traffic unavailable for this repository" : "No traffic recorded in this period"}
         </div>
       </div>
     );
@@ -40,16 +47,16 @@ export function TrafficAreaChart({
   }));
 
   return (
-    <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+    <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
       <h3 className="text-sm font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <AreaChart accessibilityLayer data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
           <defs>
-            <linearGradient id={`grad-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`${gradient}-total`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={color} stopOpacity={0.3} />
               <stop offset="95%" stopColor={color} stopOpacity={0} />
             </linearGradient>
-            <linearGradient id={`grad-${secondaryColor.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`${gradient}-unique`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={secondaryColor} stopOpacity={0.3} />
               <stop offset="95%" stopColor={secondaryColor} stopOpacity={0} />
             </linearGradient>
@@ -81,19 +88,20 @@ export function TrafficAreaChart({
             dataKey="count"
             name="Total"
             stroke={color}
-            fill={`url(#grad-${color.replace("#", "")})`}
+            fill={`url(#${gradient}-total)`}
             strokeWidth={2}
           />
           <Area
             type="monotone"
             dataKey="uniques"
-            name="Unique"
+            name={uniqueLabel}
             stroke={secondaryColor}
-            fill={`url(#grad-${secondaryColor.replace("#", "")})`}
+            fill={`url(#${gradient}-unique)`}
             strokeWidth={2}
           />
         </AreaChart>
       </ResponsiveContainer>
+      <ChartData title={title} columns={["Date", "Total", uniqueLabel]} rows={data.map((day) => [day.date, day.count, day.uniques])} />
     </div>
   );
 }

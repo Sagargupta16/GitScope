@@ -1,166 +1,28 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  getStoredToken,
-  getStoredLogin,
-  storeAuth,
-  clearAuth,
-  getLoginUrl,
-  extractTokenFromHash,
-  fetchAuthenticatedUser,
-} from "../lib/auth";
+import { useState, useEffect, useCallback } from "react";
+import { retryAuth, useAuth } from "../lib/auth";
+import { LoginLink } from "../components/LoginLink";
+import { useRequestGuard, accountCacheKey, readAccountCache, writeAccountCache } from "../components/uiLifecycle";
 import { formatNumber } from "../lib/analytics";
 
-interface LeaderboardEntry {
-  login: string;
-  name: string | null;
-  avatar_url: string;
-  public_repos: number;
-  followers: number;
-  following: number;
-  public_gists: number;
-  created_at: string;
-  totalStars: number;
-  totalForks: number;
-  languageCount: number;
-  isViewer: boolean;
-}
+import { fetchFollowing, fetchAllUsers, type LeaderboardEntry } from "../lib/leaderboard";
 
 type SortKey = "totalStars" | "public_repos" | "followers" | "totalForks" | "languageCount";
 
-const CACHE_KEY = "gitscope_leaderboard";
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
-interface CachedData {
-  entries: LeaderboardEntry[];
-  timestamp: number;
-  viewerLogin: string;
-}
-
-function loadCache(viewerLogin: string): LeaderboardEntry[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const cached: CachedData = JSON.parse(raw);
-    if (cached.viewerLogin !== viewerLogin) return null;
-    if (Date.now() - cached.timestamp > CACHE_TTL) return null;
-    return cached.entries;
-  } catch {
-    return null;
-  }
-}
-
-function saveCache(entries: LeaderboardEntry[], viewerLogin: string) {
-  const data: CachedData = { entries, timestamp: Date.now(), viewerLogin };
-  localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-}
-
-function clearCache() {
-  localStorage.removeItem(CACHE_KEY);
-}
-
-async function fetchUserWithStats(username: string, token: string): Promise<LeaderboardEntry | null> {
-  const [userRes, reposRes] = await Promise.all([
-    fetch(`https://api.github.com/users/${username}`, {
-      headers: { Authorization: `bearer ${token}` },
-    }),
-    fetch(`https://api.github.com/users/${username}/repos?per_page=100&sort=stars&direction=desc`, {
-      headers: { Authorization: `bearer ${token}` },
-    }),
-  ]);
-
-  if (!userRes.ok || !reposRes.ok) return null;
-
-  const user = await userRes.json();
-  const repos: { stargazers_count: number; forks_count: number; language: string | null; fork: boolean; archived: boolean }[] = await reposRes.json();
-
-  const totalStars = repos.reduce((sum, r) => sum + r.stargazers_count, 0);
-  const totalForks = repos.reduce((sum, r) => sum + r.forks_count, 0);
-  const langSet = new Set<string>();
-  for (const r of repos) {
-    if (r.language && !r.fork && !r.archived) langSet.add(r.language);
-  }
-
-  return {
-    login: user.login,
-    name: user.name,
-    avatar_url: user.avatar_url,
-    public_repos: user.public_repos,
-    followers: user.followers,
-    following: user.following,
-    public_gists: user.public_gists,
-    created_at: user.created_at,
-    totalStars,
-    totalForks,
-    languageCount: langSet.size,
-    isViewer: false,
-  };
-}
-
-async function fetchFollowing(token: string): Promise<string[]> {
-  const logins: string[] = [];
-  let page = 1;
-  while (page <= 5) {
-    const res = await fetch(`https://api.github.com/user/following?per_page=100&page=${page}`, {
-      headers: { Authorization: `bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
-    const data: { login: string }[] = await res.json();
-    if (data.length === 0) break;
-    logins.push(...data.map((u) => u.login));
-    if (data.length < 100) break;
-    page++;
-  }
-  return logins;
-}
-
-// Batch fetches in groups of 5 to avoid rate limiting while still being fast
-async function fetchAllUsers(
-  usernames: string[],
-  token: string,
-  viewerLogin: string,
-  onProgress: (msg: string) => void,
-): Promise<LeaderboardEntry[]> {
-  const results: LeaderboardEntry[] = [];
-  const batchSize = 5;
-
-  for (let i = 0; i < usernames.length; i += batchSize) {
-    const batch = usernames.slice(i, i + batchSize);
-    onProgress(`Fetching ${i + 1}-${Math.min(i + batchSize, usernames.length)} of ${usernames.length}...`);
-
-    const batchResults = await Promise.all(
-      batch.map((u) => fetchUserWithStats(u, token)),
-    );
-
-    for (let j = 0; j < batchResults.length; j++) {
-      const entry = batchResults[j];
-      if (entry) {
-        entry.isViewer = batch[j] === viewerLogin;
-        results.push(entry);
-      }
-    }
-  }
-
-  return results;
-}
+const CACHE_TTL = 10 * 60 * 1000;
 
 function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) return <span className="text-lg" title="1st">&#129351;</span>;
-  if (rank === 2) return <span className="text-lg" title="2nd">&#129352;</span>;
-  if (rank === 3) return <span className="text-lg" title="3rd">&#129353;</span>;
+  if (rank === 1) return <span role="img" aria-label="Rank 1" className="text-lg" title="1st">&#129351;</span>;
+  if (rank === 2) return <span role="img" aria-label="Rank 2" className="text-lg" title="2nd">&#129352;</span>;
+  if (rank === 3) return <span role="img" aria-label="Rank 3" className="text-lg" title="3rd">&#129353;</span>;
   return <span className="text-sm text-[var(--color-github-muted)] font-mono w-6 text-center">#{rank}</span>;
 }
 
-function getCacheAge(): string | null {
+function cacheAge(login: string, session: string): string | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const cached: CachedData = JSON.parse(raw);
-    const mins = Math.round((Date.now() - cached.timestamp) / 60000);
-    if (mins < 1) return "just now";
-    return `${mins}m ago`;
-  } catch {
-    return null;
-  }
+    const cached = JSON.parse(localStorage.getItem(accountCacheKey("leaderboard", login, session)) ?? "null");
+    const minutes = Math.round((Date.now() - cached.timestamp) / 60000);
+    return Number.isFinite(minutes) ? minutes < 1 ? "just now" : `${minutes}m ago` : null;
+  } catch { return null; }
 }
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -172,96 +34,72 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 ];
 
 export function Leaderboard() {
-  const [token, setToken] = useState<string | null>(getStoredToken);
-  const [viewerLogin, setViewerLogin] = useState<string | null>(getStoredLogin);
+  const { token, login: viewerLogin, loading: authLoading, error: authError, signOut } = useAuth();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("totalStars");
   const [fromCache, setFromCache] = useState(false);
-  const loadedRef = useRef(false);
-
-  // Handle OAuth redirect
-  useEffect(() => {
-    const hashToken = extractTokenFromHash();
-    if (hashToken) {
-      setToken(hashToken);
-      fetchAuthenticatedUser(hashToken).then((login) => {
-        storeAuth(hashToken, login);
-        setViewerLogin(login);
-      }).catch(() => {
-        setError("Invalid token received. Please try signing in again.");
-      });
-    }
-
-    const hash = globalThis.location.hash;
-    if (hash.includes("error=auth_failed")) {
-      setError("Authentication failed. Please try again.");
-      globalThis.history.replaceState(null, "", globalThis.location.pathname);
-    }
-  }, []);
+  const { start, cancel, session } = useRequestGuard(token, viewerLogin);
 
   const loadLeaderboard = useCallback(async (forceRefresh = false) => {
-    if (!token || !viewerLogin) return;
-
-    // Try cache first (unless forced refresh)
+    if (authLoading || !token || !viewerLogin) return;
+    const request = start();
+    const key = accountCacheKey("leaderboard", viewerLogin, session);
+    setError(null);
     if (!forceRefresh) {
-      const cached = loadCache(viewerLogin);
-      if (cached) {
+      const cached = readAccountCache<LeaderboardEntry[]>(key, viewerLogin, session, CACHE_TTL);
+      if (Array.isArray(cached) && cached.some((entry) => entry.isViewer && entry.login.toLowerCase() === viewerLogin.toLowerCase())) {
         setEntries(cached);
         setFromCache(true);
+        setLoading(false);
         return;
       }
     }
-
     setLoading(true);
-    setError(null);
     setEntries([]);
     setFromCache(false);
-
+    setProgress("Fetching your following list…");
     try {
-      setProgress("Fetching your following list...");
-      const following = await fetchFollowing(token);
-      const allUsers = [viewerLogin, ...following];
-
-      const results = await fetchAllUsers(allUsers, token, viewerLogin, setProgress);
-
+      const following = await fetchFollowing(token, request.signal);
+      if (!request.current()) return;
+      const allUsers = [...new Set([viewerLogin, ...following].map((name) => name.toLowerCase()))];
+      const results = await fetchAllUsers(allUsers, token, viewerLogin, (message) => { if (request.current()) setProgress(message); }, request.signal);
+      if (!request.current()) return;
       setEntries(results);
-      saveCache(results, viewerLogin);
-      setProgress("");
+      writeAccountCache(key, viewerLogin, session, results);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      if (request.current()) {
+        setError(err instanceof Error ? err.message : "Leaderboard could not load");
+        cancel();
+        setLoading(false);
+        setProgress("");
+      }
     } finally {
-      setLoading(false);
+      if (request.current()) { setLoading(false); setProgress(""); }
     }
-  }, [token, viewerLogin]);
+  }, [authLoading, token, viewerLogin, start, cancel, session]);
 
-  // Auto-load when authenticated (once)
   useEffect(() => {
-    if (token && viewerLogin && !loadedRef.current) {
-      loadedRef.current = true;
-      loadLeaderboard();
-    }
-  }, [token, viewerLogin, loadLeaderboard]);
+    setEntries([]);
+    void loadLeaderboard();
+    return cancel;
+  }, [loadLeaderboard, cancel]);
 
-  const sorted = [...entries].sort((a, b) => b[sortBy] - a[sortBy]);
+  const sorted = [...entries].sort((a, b) => b[sortBy] - a[sortBy] || a.login.localeCompare(b.login));
   const viewerRank = sorted.findIndex((e) => e.isViewer) + 1;
-  const cacheAge = fromCache ? getCacheAge() : null;
+  const age = fromCache && viewerLogin ? cacheAge(viewerLogin, session) : null;
 
   function handleSignOut() {
-    clearAuth();
-    clearCache();
-    setToken(null);
-    setViewerLogin(null);
+    cancel();
     setEntries([]);
-    loadedRef.current = false;
+    setLoading(false);
+    setError(null);
+    signOut();
   }
 
-  function handleRefresh() {
-    clearCache();
-    loadLeaderboard(true);
-  }
+  function handleRefresh() { void loadLeaderboard(true); }
 
   // Stat value for the expanded row
   function getStatValue(entry: LeaderboardEntry, key: SortKey): string {
@@ -282,32 +120,43 @@ export function Leaderboard() {
         </p>
 
         {/* Not authenticated */}
-        {!token && (
+        {!authLoading && !token && (
           <div className="text-center py-16">
             <p className="text-[var(--color-github-muted)] mb-6">
               Sign in with GitHub to see your leaderboard. We'll compare your stats
               against everyone you follow.
             </p>
-            <a
-              href={getLoginUrl()}
+            <LoginLink
+              returnTo="/leaderboard"
               className="inline-block bg-[var(--color-brand)] hover:bg-[var(--color-brand-light)] text-white px-6 py-3 rounded-lg font-semibold no-underline transition-colors"
             >
               Sign in with GitHub
-            </a>
+            </LoginLink>
           </div>
         )}
 
         {/* Loading */}
-        {loading && (
+        {(authLoading || loading) && (
           <div className="text-center py-16">
             <div className="inline-block w-8 h-8 border-2 border-[var(--color-github-border)] border-t-[var(--color-brand)] rounded-full animate-spin mb-4" />
-            <p className="text-[var(--color-github-muted)] text-sm">{progress}</p>
+            <p role="status" aria-live="polite" className="text-[var(--color-github-muted)] text-sm">{authLoading ? "Checking sign-in…" : progress}</p>
           </div>
         )}
 
+        {token && (loading || error) && <div className="text-center mb-4">
+          {error && <button onClick={handleRefresh} className="mr-4 text-sm">Try again</button>}
+          <button onClick={handleSignOut} className="text-sm">Sign out</button>
+        </div>}
+        {authError && <div className="text-center mb-4">
+          <p role="alert" className="text-red-400 mb-2">{authError}</p>
+          <button type="button" onClick={() => void retryAuth()} disabled={authLoading}
+            className="text-sm text-[var(--color-brand-light)] underline disabled:opacity-50">
+            Retry verification
+          </button>
+        </div>}
         {/* Error */}
         {error && (
-          <div className="text-center text-red-400 mb-6 p-4 rounded-lg border border-red-900 bg-red-950/30">
+          <div role="alert" className="text-center text-red-400 mb-6 p-4 rounded-lg border border-red-900 bg-red-950/30">
             {error}
           </div>
         )}
@@ -337,6 +186,7 @@ export function Leaderboard() {
                   <button
                     key={key}
                     onClick={() => setSortBy(key)}
+                    aria-pressed={sortBy === key}
                     className={`text-xs px-3 py-1 rounded-full border transition-colors cursor-pointer ${
                       sortBy === key
                         ? "border-[var(--color-brand)] text-[var(--color-brand)] bg-[var(--color-brand)]/10"
@@ -348,9 +198,9 @@ export function Leaderboard() {
                 ))}
               </div>
               <div className="flex items-center gap-3">
-                {cacheAge && (
+                {fromCache && (
                   <span className="text-[10px] text-[var(--color-github-muted)]">
-                    cached {cacheAge}
+                    cached {age ?? "this session"}
                   </span>
                 )}
                 <button
@@ -371,7 +221,7 @@ export function Leaderboard() {
             {/* Table */}
             <div className="rounded-lg border border-[var(--color-github-border)] overflow-hidden">
               {/* Header */}
-              <div className="flex items-center gap-3 px-4 py-2 bg-[var(--color-github-darker)] border-b border-[var(--color-github-border)] text-[10px] text-[var(--color-github-muted)] uppercase tracking-wide">
+              <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-[var(--color-github-darker)] border-b border-[var(--color-github-border)] text-[10px] text-[var(--color-github-muted)] uppercase tracking-wide">
                 <div className="w-8 text-center shrink-0">#</div>
                 <div className="w-8 shrink-0" />
                 <div className="flex-1">User</div>
@@ -385,7 +235,7 @@ export function Leaderboard() {
               {sorted.map((entry, i) => (
                 <div
                   key={entry.login}
-                  className={`flex items-center gap-3 px-4 py-3 border-b border-[var(--color-github-border)] last:border-0 ${
+                  className={`leaderboard-row flex items-center gap-3 px-4 py-3 border-b border-[var(--color-github-border)] last:border-0 ${
                     entry.isViewer ? "bg-[var(--color-brand)]/5" : "bg-[var(--color-github-dark)]"
                   }`}
                 >
@@ -415,7 +265,7 @@ export function Leaderboard() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 shrink-0 text-right">
+                  <div className="leaderboard-metrics flex items-center gap-4 shrink-0 text-right">
                     {SORT_OPTIONS.map(({ key, label }) => (
                       <div key={key} className="text-center min-w-[50px]">
                         <div className={`text-sm font-semibold ${sortBy === key ? "text-[var(--color-brand)]" : ""}`}>
@@ -430,7 +280,7 @@ export function Leaderboard() {
             </div>
 
             {/* Footer info */}
-            <p className="text-center text-xs text-[var(--color-github-muted)] mt-4">
+            <p role="status" aria-live="polite" className="text-center text-xs text-[var(--color-github-muted)] mt-4">
               {entries.length} users &middot; Data is cached for 10 minutes to avoid rate limits
             </p>
           </>

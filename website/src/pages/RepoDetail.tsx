@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router";
-import { getStoredToken, getStoredLogin, getLoginUrl } from "../lib/auth";
+import { useAuth } from "../lib/auth";
+import { LoginLink } from "../components/LoginLink";
+import { useRequestGuard } from "../components/uiLifecycle";
 import { fetchRepoDetail } from "../lib/dashboard";
 import { formatNumber } from "../lib/analytics";
 import type { RepoDetailData } from "../lib/types";
@@ -19,37 +21,46 @@ function formatSize(kb: number): string {
 
 export function RepoDetail() {
   const { name } = useParams<{ name: string }>();
-  const token = getStoredToken();
-  const login = getStoredLogin();
+  const { token, login, scopes, loading: authLoading, error: authError, signOut } = useAuth();
   const [data, setData] = useState<RepoDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loadedRef = useRef(false);
+  const [retry, setRetry] = useState(0);
+  const { start, cancel } = useRequestGuard(token, login);
+  const trafficAccess = scopes.includes("repo");
 
   useEffect(() => {
-    if (!token || !login || !name || loadedRef.current) return;
-    loadedRef.current = true;
+    setData(null);
+    setError(null);
+    if (authLoading || !token || !login || !name || !trafficAccess) { setLoading(false); return cancel; }
+    const request = start();
+    setLoading(true);
+    fetchRepoDetail(login, name, token, request.signal)
+      .then((result) => { if (request.current()) setData(result); })
+      .catch((err) => { if (request.current()) setError(err instanceof Error ? err.message : "Failed to load repo data"); })
+      .finally(() => { if (request.current()) setLoading(false); });
+    return cancel;
+  }, [authLoading, token, login, name, trafficAccess, retry, start, cancel]);
 
-    fetchRepoDetail(login, name, token)
-      .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load repo data"))
-      .finally(() => setLoading(false));
-  }, [token, login, name]);
+  function handleSignOut() { cancel(); setData(null); signOut(); }
+  if (authLoading) return <p role="status" aria-live="polite" className="py-20 px-6 text-center">Checking sign-in…</p>;
 
-  if (!token) {
+  if (!token || !trafficAccess) {
     return (
       <section className="py-20 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <h1 className="text-3xl font-bold mb-4">{name}</h1>
           <p className="text-[var(--color-github-muted)] mb-8">
-            Sign in to view traffic analytics for this repository.
+            {token ? "Enable traffic analytics to view this repository. GitHub’s repo permission includes broad access to private repositories; GitScope uses it to read analytics." : "Sign in to view traffic analytics for this repository."}
           </p>
-          <a
-            href={getLoginUrl()}
+          <LoginLink
+            traffic={Boolean(token)} returnTo={`/dashboard/repo/${encodeURIComponent(name ?? "")}`}
             className="inline-block bg-[var(--color-brand)] hover:bg-[var(--color-brand-light)] text-white px-6 py-3 rounded-lg font-semibold no-underline transition-colors"
           >
-            Sign in with GitHub
-          </a>
+            {token ? "Enable traffic analytics" : "Sign in with GitHub"}
+          </LoginLink>
+          {authError && <p role="alert" className="text-red-400 mt-4">{authError}</p>}
+          {token && <button onClick={handleSignOut} className="block mx-auto mt-4 text-sm">Sign out</button>}
         </div>
       </section>
     );
@@ -60,7 +71,8 @@ export function RepoDetail() {
       <section className="py-20 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <div className="inline-block w-8 h-8 border-2 border-[var(--color-github-border)] border-t-[var(--color-brand)] rounded-full animate-spin mb-4" />
-          <p className="text-[var(--color-github-muted)] text-sm">Loading {name}...</p>
+          <p role="status" aria-live="polite" className="text-[var(--color-github-muted)] text-sm">Loading {name}...</p>
+          <button onClick={handleSignOut} className="mt-4 text-sm">Sign out</button>
         </div>
       </section>
     );
@@ -70,9 +82,11 @@ export function RepoDetail() {
     return (
       <section className="py-20 px-6">
         <div className="max-w-2xl mx-auto text-center">
-          <div className="text-red-400 mb-6 p-4 rounded-lg border border-red-900 bg-red-950/30">
+          <div role="alert" className="text-red-400 mb-6 p-4 rounded-lg border border-red-900 bg-red-950/30">
             {error ?? "Failed to load data"}
           </div>
+          <button onClick={() => setRetry((value) => value + 1)} className="mr-4 text-sm">Try again</button>
+          <button onClick={handleSignOut} className="mr-4 text-sm">Sign out</button>
           <Link
             to="/dashboard"
             className="text-[var(--color-brand)] hover:underline no-underline text-sm"
@@ -117,6 +131,14 @@ export function RepoDetail() {
           </a>
         </div>
 
+        <div className="flex gap-4 mb-4">
+          <button onClick={() => setRetry((value) => value + 1)} className="text-sm text-[var(--color-github-muted)]">Refresh</button>
+          <button onClick={handleSignOut} className="text-sm text-[var(--color-github-muted)]">Sign out</button>
+        </div>
+        {(data.warnings.length > 0 || data.statisticsPending) && <div role="status" aria-live="polite" className="text-sm text-[var(--color-github-muted)] mb-6">
+          {data.statisticsPending && <p>GitHub is still preparing repository statistics. Refresh to check again.</p>}
+          {data.warnings.length > 0 && <ul className="list-disc pl-5">{data.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul>}
+        </div>}
         {/* Topics */}
         {info.topics.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
@@ -156,14 +178,9 @@ export function RepoDetail() {
           <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
             {info.default_branch} branch
           </span>
-          {info.watchers_count > 0 && (
-            <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
-              {info.watchers_count} watchers
-            </span>
-          )}
           {info.subscribers_count > 0 && (
             <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
-              {info.subscribers_count} subscribers
+              {info.subscribers_count} watchers
             </span>
           )}
           {info.has_pages && (
@@ -178,7 +195,7 @@ export function RepoDetail() {
           )}
           {totalCommits !== null && (
             <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[var(--color-github-muted)]">
-              {totalCommits} your commits (of {totalAllCommits} total)
+              {totalCommits} owner commits (of {totalAllCommits} total, last 52 weeks)
             </span>
           )}
         </div>
@@ -186,34 +203,35 @@ export function RepoDetail() {
         {/* Traffic stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
-            label="Total Views"
-            value={formatNumber(traffic.views.count)}
-            subValue={`${formatNumber(traffic.views.uniques)} unique`}
+            label="Views (14d)"
+            value={traffic.views.status === "unavailable" ? "Unavailable" : formatNumber(traffic.views.count)}
+            subValue={traffic.views.status === "unavailable" ? undefined : `${formatNumber(traffic.views.uniques)} unique visitors`}
           />
           <StatCard
-            label="Total Clones"
-            value={formatNumber(traffic.clones.count)}
-            subValue={`${formatNumber(traffic.clones.uniques)} unique`}
+            label="Clones (14d)"
+            value={traffic.clones.status === "unavailable" ? "Unavailable" : formatNumber(traffic.clones.count)}
+            subValue={traffic.clones.status === "unavailable" ? undefined : `${formatNumber(traffic.clones.uniques)} unique cloners`}
           />
           <StatCard
             label="Avg Views/Day"
             value={
-              traffic.views.views.length > 0
+              traffic.views.status === "unavailable" ? "Unavailable" : traffic.views.views.length > 0
                 ? (traffic.views.count / traffic.views.views.length).toFixed(1)
                 : "0"
             }
           />
           <StatCard
             label="Referrers"
-            value={traffic.referrers.length}
+            value={traffic.warnings.some((warning) => /referrers unavailable/i.test(warning)) ? "Unavailable" : traffic.referrers.length}
             subValue={traffic.referrers[0]?.referrer ? `Top: ${traffic.referrers[0].referrer}` : undefined}
           />
         </div>
 
         {/* Traffic charts (14 days) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          <TrafficAreaChart data={traffic.views.views} title="Views (last 14 days)" />
+          <TrafficAreaChart unavailable={traffic.views.status === "unavailable"} data={traffic.views.views} title="Views (last 14 days)" />
           <TrafficAreaChart
+            unavailable={traffic.clones.status === "unavailable"}
             data={traffic.clones.clones}
             title="Clones (last 14 days)"
             color="#da3633"
@@ -233,7 +251,7 @@ export function RepoDetail() {
 
         {/* Referrers */}
         <div className="mb-8">
-          <ReferrersChart referrers={traffic.referrers} title="Traffic Sources" />
+          <ReferrersChart referrers={traffic.referrers} title="Traffic Sources" unavailable={traffic.warnings.some((warning) => /referrers unavailable/i.test(warning))} />
         </div>
 
         {/* Referrer table */}

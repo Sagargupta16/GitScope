@@ -1,3 +1,4 @@
+import { ChartData } from "./ChartData";
 import {
   BarChart,
   Bar,
@@ -12,30 +13,34 @@ import type { Referrer } from "../../lib/types";
 interface ReferrersChartProps {
   referrers: Referrer[];
   title?: string;
+  uniqueLabel?: string;
+  unavailable?: boolean;
 }
 
 export function ReferrersChart({
   referrers,
   title = "Top Referrers",
+  uniqueLabel = "Unique",
+  unavailable = false,
 }: ReferrersChartProps) {
   const top = referrers.slice(0, 10);
 
-  if (top.length === 0) {
+  if (top.length === 0 || unavailable) {
     return (
-      <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+      <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
         <h3 className="text-sm font-semibold mb-4">{title}</h3>
         <div className="text-center text-[var(--color-github-muted)] py-8 text-sm">
-          No referrer data available
+          {unavailable ? "Referrer data unavailable" : "No referrers recorded in available data"}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+    <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
       <h3 className="text-sm font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={Math.max(160, top.length * 36)}>
-        <BarChart data={top} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 0 }}>
+        <BarChart accessibilityLayer data={top} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#30363d" horizontal={false} />
           <XAxis
             type="number"
@@ -50,7 +55,7 @@ export function ReferrersChart({
             tick={{ fill: "#8b949e", fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            width={140}
+            width={105}
           />
           <Tooltip
             contentStyle={{
@@ -70,13 +75,14 @@ export function ReferrersChart({
           />
           <Bar
             dataKey="uniques"
-            name="Unique"
+            name={uniqueLabel}
             fill="#238636"
             radius={[0, 4, 4, 0]}
             maxBarSize={24}
           />
         </BarChart>
       </ResponsiveContainer>
+      <ChartData title={title} columns={["Referrer", "Views", uniqueLabel]} rows={top.map((referrer) => [referrer.referrer, referrer.count, referrer.uniques])} />
     </div>
   );
 }
