@@ -1,100 +1,21 @@
 export function Privacy() {
+  const sections = [
+    ["Data and permissions", "GitScope reads GitHub profiles, contributions, repositories, and following lists. Optional traffic analytics reads views, clones, referrers, and repository activity, including private repository metadata when authorized. Basic sign-in requests profile permissions. Enabling traffic analytics requests GitHub's broad repo permission, which includes write capability, although GitScope uses it only to read data. GitHub may retain permissions previously granted to this OAuth app."],
+    ["Authentication", "A Cloudflare Worker exchanges authorization codes with GitHub using a server-side secret. It validates a signed, short-lived browser cookie; the website also matches the callback to a pending login in this tab. The Worker has no token database and does not intentionally log tokens. GitHub and Cloudflare process requests under their own policies."],
+    ["Browser storage", "Extension tokens stay in device-local Chrome storage. Legacy synchronized tokens are migrated and removed from sync. Website tokens stay in tab sessionStorage; legacy localStorage sign-ins are validated and migrated. Dashboard and leaderboard caches use account and session identifiers and remain fresh for five and ten minutes. These localStorage caches can include private repository metadata. Sign-out clears GitScope credentials and caches and notifies other open website tabs."],
+    ["Hosting and network requests", "GitScope uses GitHub's API and authorization service, the Cloudflare OAuth Worker, GitHub avatars, and a public screenshot from raw.githubusercontent.com. The GitHub Pages website shares an origin with other sites at sagargupta16.github.io; paths do not isolate browser storage. GitScope has no application analytics, advertising trackers, telemetry integration, or server-side analytics history."],
+    ["Removing access", "Sign out to clear the stored GitScope session and caches. Clear browser site data or uninstall the extension to remove remaining storage. To revoke GitHub access itself, remove GitScope under GitHub Settings > Applications > Authorized OAuth Apps. Local sign-out does not revoke authorization at GitHub."],
+  ];
   return (
-    <section className="py-12 px-6">
-      <div className="max-w-3xl mx-auto prose prose-invert">
-        <h1 className="text-3xl font-bold mb-6">Privacy Policy</h1>
-        <p className="text-[var(--color-github-muted)] mb-4">Last updated: March 28, 2026</p>
-
-        <div className="space-y-6 text-[var(--color-github-text)] text-sm leading-relaxed">
-          <section>
-            <h2 className="text-lg font-semibold mb-2">What GitScope Does</h2>
-            <p>
-              GitScope is a browser extension that adds a contribution insights dashboard
-              to GitHub profile pages. It fetches publicly available data from GitHub's API
-              to display stats, charts, and activity patterns.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold mb-2">Data Collection</h2>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>We do not collect, store, or transmit any personal data to our servers.</li>
-              <li>Your GitHub OAuth token is stored locally in your browser using Chrome's storage API.</li>
-              <li>API responses are cached locally for 5 minutes to reduce API calls.</li>
-              <li>No analytics, tracking, or telemetry of any kind.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold mb-2">Third-Party Services</h2>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>
-                <strong>GitHub API</strong> (api.github.com) - Used to fetch profile data.
-                Subject to GitHub's privacy policy.
-              </li>
-              <li>
-                <strong>Cloudflare Worker</strong> (gpi-auth.sg85207.workers.dev) - Used only
-                during OAuth authentication to exchange the auth code for a token. The worker
-                does not store tokens or any user data.
-              </li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold mb-2">Permissions</h2>
-            <p>
-              The extension requests <code className="bg-[var(--color-github-dark)] px-1 rounded">read:user</code> scope
-              to access contribution data via GitHub's GraphQL API. This is read-only access
-              and cannot modify any data on your GitHub account.
-            </p>
-            <p className="mt-2">
-              The website dashboard additionally requests <code className="bg-[var(--color-github-dark)] px-1 rounded">repo</code> scope
-              to access repository traffic data (views, clones, referrers) via GitHub's REST API.
-              GitScope only reads traffic statistics -- it never creates, modifies, or deletes
-              anything on your GitHub account. The extension does not request this scope.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold mb-2">Dashboard Data</h2>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Dashboard traffic data (views, clones, referrers) is fetched live from GitHub's API and cached in localStorage for 5 minutes.</li>
-              <li>No traffic data is stored on any external server.</li>
-              <li>You can clear cached dashboard data by clicking "Sync Now" or signing out.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold mb-2">Open Source</h2>
-            <p>
-              GitScope is fully open source. You can audit the complete source code at{" "}
-              <a
-                href="https://github.com/Sagargupta16/GitScope"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--color-brand)] hover:underline"
-              >
-                github.com/Sagargupta16/GitScope
-              </a>.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold mb-2">Contact</h2>
-            <p>
-              For privacy concerns, open an issue on the{" "}
-              <a
-                href="https://github.com/Sagargupta16/GitScope/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--color-brand)] hover:underline"
-              >
-                GitHub repository
-              </a>.
-            </p>
-          </section>
-        </div>
+    <section className="py-12 px-6"><div className="max-w-3xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6">Privacy Policy</h1>
+      <p className="text-[var(--color-github-muted)] mb-6">Updated September 19, 2026</p>
+      <div className="space-y-6 text-sm leading-relaxed">
+        {sections.map(([title, text]) => <section key={title}><h2 className="text-lg font-semibold mb-2">{title}</h2><p>{text}</p></section>)}
+        <section><h2 className="text-lg font-semibold mb-2">Source and contact</h2>
+          <p>GitScope is open source. Read the <a className="text-[var(--color-brand-light)] underline" href="https://github.com/Sagargupta16/GitScope/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">full policy and source</a> or <a className="text-[var(--color-brand-light)] underline" href="https://github.com/Sagargupta16/GitScope/issues" target="_blank" rel="noopener noreferrer">ask a privacy question</a>.</p>
+        </section>
       </div>
-    </section>
+    </div></section>
   );
 }

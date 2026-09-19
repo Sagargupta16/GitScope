@@ -3,33 +3,16 @@ import type {
   FullProfileStats,
   DashboardData,
   DashboardRepo,
-  TrafficData,
-  CloneData,
   Referrer,
   TrafficDay,
   RepoDetailData,
   WeeklyCommitActivity,
   ParticipationData,
+  RepoTraffic,
 } from "./types";
-import { fetchFullProfile } from "./github";
-
-const GITHUB_API = "https://api.github.com";
-
-function headers(token: string): HeadersInit {
-  return {
-    Authorization: `bearer ${token}`,
-    Accept: "application/vnd.github+json",
-  };
-}
-
-async function ghFetch<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`${GITHUB_API}${path}`, { headers: headers(token) });
-  if (res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0") {
-    throw new Error("GitHub API rate limit exceeded. Please wait a few minutes.");
-  }
-  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
-  return res.json();
-}
+import { fullProfile } from "./github";
+import { createGitHubClient, errorMessage, GitHubApiError, throwIfAborted } from "./http";
+type Client = ReturnType<typeof createGitHubClient>;
 
 interface GitHubRepoRaw {
   name: string;
@@ -45,19 +28,11 @@ interface GitHubRepoRaw {
 }
 
 // Fetch all owned repos (paginated)
-async function fetchAllRepos(token: string): Promise<GitHubRepoRaw[]> {
-  const repos: GitHubRepoRaw[] = [];
-  let page = 1;
-  while (page <= 10) {
-    const batch = await ghFetch<GitHubRepoRaw[]>(
-      `/user/repos?type=owner&sort=stars&direction=desc&per_page=100&page=${page}`,
-      token,
-    );
-    repos.push(...batch);
-    if (batch.length < 100) break;
-    page++;
-  }
-  return repos;
+async function fetchAllRepos(client: Client): Promise<GitHubRepoRaw[]> {
+  const repos = await client.paginate<GitHubRepoRaw>(
+    "/user/repos?type=owner&sort=full_name&direction=asc", (repo) => repo.html_url,
+  );
+  return repos.sort((a, b) => b.stargazers_count - a.stargazers_count);
 }
 
 // GitHub API returns "timestamp" not "date" for traffic entries
@@ -81,6 +56,11 @@ interface GitHubTrafficClones {
 
 // Normalize GitHub API timestamp to our TrafficDay date format
 function normalizeTrafficEntries(entries: GitHubTrafficEntry[]): TrafficDay[] {
+  if (!Array.isArray(entries) || entries.some((entry) =>
+    typeof entry.timestamp !== "string" || !Number.isFinite(Date.parse(entry.timestamp)) ||
+    !validCount(entry.count) || !validCount(entry.uniques))) {
+    throw new GitHubApiError("GitHub returned invalid traffic.", "invalid-response");
+  }
   return entries.map((e) => ({
     date: e.timestamp.split("T")[0],
     count: e.count,
@@ -88,37 +68,81 @@ function normalizeTrafficEntries(entries: GitHubTrafficEntry[]): TrafficDay[] {
   }));
 }
 
-// Fetch traffic for a single repo (requires repo scope)
+function unavailableTraffic(repo: string, warning: string): RepoTraffic {
+  return {
+    repo,
+    // Keep the legacy numeric payload shape; status, not these placeholders,
+    // determines availability. Public repo totals use null for missing data.
+    views: { status: "unavailable", count: 0, uniques: 0, views: [] },
+    clones: { status: "unavailable", count: 0, uniques: 0, clones: [] },
+    referrers: [],
+    warnings: [warning],
+  };
+}
+
+function validCount(value: number): boolean {
+  return Number.isInteger(value) && value >= 0;
+}
+
+// Each endpoint settles independently: denied clones must not erase valid views.
 async function fetchRepoTraffic(
   owner: string,
   repo: string,
-  token: string,
-): Promise<{ views: TrafficData; clones: CloneData; referrers: Referrer[] }> {
+  client: Client,
+  signal?: AbortSignal,
+): Promise<RepoTraffic> {
+  const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/traffic`;
+  const [views, clones, referrers] = await Promise.allSettled([
+    client.request<GitHubTrafficViews>(`${path}/views`),
+    client.request<GitHubTrafficClones>(`${path}/clones`),
+    client.request<Referrer[]>(`${path}/popular/referrers`),
+  ]);
+  throwIfAborted(signal);
+  const result = unavailableTraffic(repo, "");
+  result.warnings = [];
+  if (views.status === "fulfilled") {
+    try {
+      if (!validCount(views.value?.count) || !validCount(views.value?.uniques)) throw new Error("Invalid traffic");
+      result.views = {
+        status: "ok", count: views.value.count, uniques: views.value.uniques,
+        views: normalizeTrafficEntries(views.value.views),
+      };
+    } catch { result.warnings.push(`${repo}: views unavailable (invalid response).`); }
+  } else result.warnings.push(`${repo}: views unavailable. ${errorMessage(views.reason)}`);
+  if (clones.status === "fulfilled") {
+    try {
+      if (!validCount(clones.value?.count) || !validCount(clones.value?.uniques)) throw new Error("Invalid traffic");
+      result.clones = {
+        status: "ok", count: clones.value.count, uniques: clones.value.uniques,
+        clones: normalizeTrafficEntries(clones.value.clones),
+      };
+    } catch { result.warnings.push(`${repo}: clones unavailable (invalid response).`); }
+  } else result.warnings.push(`${repo}: clones unavailable. ${errorMessage(clones.reason)}`);
+  if (referrers.status === "fulfilled" && Array.isArray(referrers.value) && referrers.value.every((referrer) =>
+    typeof referrer?.referrer === "string" && validCount(referrer.count) && validCount(referrer.uniques))) {
+    result.referrers = referrers.value;
+  } else {
+    result.warnings.push(`${repo}: referrers unavailable.${referrers.status === "rejected" ? ` ${errorMessage(referrers.reason)}` : ""}`);
+  }
+  return result;
+}
+
+interface RepoInfoRaw extends Omit<RepoDetailData["info"], "license"> {
+  license: { spdx_id: string } | null;
+}
+
+async function optionalStatistics<T>(
+  client: Client, path: string, valid: (value: T) => boolean, signal?: AbortSignal,
+): Promise<{ value: T | null; warning?: string; pending: boolean }> {
   try {
-    const [rawViews, rawClones, referrers] = await Promise.all([
-      ghFetch<GitHubTrafficViews>(`/repos/${owner}/${repo}/traffic/views`, token),
-      ghFetch<GitHubTrafficClones>(`/repos/${owner}/${repo}/traffic/clones`, token),
-      ghFetch<Referrer[]>(`/repos/${owner}/${repo}/traffic/popular/referrers`, token),
-    ]);
+    const value = await client.statistics<T>(path);
+    if (!valid(value)) throw new GitHubApiError("GitHub returned invalid statistics.", "invalid-response");
+    return { value, pending: false };
+  } catch (error) {
+    throwIfAborted(signal);
     return {
-      views: {
-        count: rawViews.count,
-        uniques: rawViews.uniques,
-        views: normalizeTrafficEntries(rawViews.views),
-      },
-      clones: {
-        count: rawClones.count,
-        uniques: rawClones.uniques,
-        clones: normalizeTrafficEntries(rawClones.clones),
-      },
-      referrers,
-    };
-  } catch {
-    // Traffic endpoints return 403 for repos without push access (forks, etc.)
-    return {
-      views: { count: 0, uniques: 0, views: [] },
-      clones: { count: 0, uniques: 0, clones: [] },
-      referrers: [],
+      value: null, warning: errorMessage(error),
+      pending: error instanceof GitHubApiError && error.kind === "pending",
     };
   }
 }
@@ -167,52 +191,48 @@ export async function fetchRepoDetail(
   owner: string,
   repo: string,
   token: string,
+  signal?: AbortSignal,
 ): Promise<RepoDetailData> {
-  const [traffic, infoRes, commitActivityRes, participationRes] = await Promise.all([
-    fetchRepoTraffic(owner, repo, token),
-    fetch(`${GITHUB_API}/repos/${owner}/${repo}`, { headers: headers(token) }),
-    fetch(`${GITHUB_API}/repos/${owner}/${repo}/stats/commit_activity`, { headers: headers(token) }),
-    fetch(`${GITHUB_API}/repos/${owner}/${repo}/stats/participation`, { headers: headers(token) }),
+  const client = createGitHubClient(token, signal);
+  const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  const info = await client.request<RepoInfoRaw>(path);
+  const [traffic, activity, participation] = await Promise.all([
+    fetchRepoTraffic(owner, repo, client, signal),
+    optionalStatistics<WeeklyCommitActivity[]>(client, `${path}/stats/commit_activity`,
+      (value) => Array.isArray(value) && value.every((week) => week &&
+        validCount(week.week) && validCount(week.total) &&
+        Array.isArray(week.days) && week.days.length === 7 && week.days.every(validCount)), signal),
+    optionalStatistics<ParticipationData>(client, `${path}/stats/participation`,
+      (value) => Boolean(value && Array.isArray(value.all) && Array.isArray(value.owner) &&
+        value.all.every(validCount) && value.owner.every(validCount) && value.all.length === value.owner.length), signal),
   ]);
-
-  const info = infoRes.ok ? await infoRes.json() : null;
-  const commitActivity: WeeklyCommitActivity[] = commitActivityRes.ok
-    ? await commitActivityRes.json().then((d: unknown) => Array.isArray(d) ? d : [])
-    : [];
-  const participation: ParticipationData | null = participationRes.ok
-    ? await participationRes.json()
-    : null;
-
+  const warnings = [...traffic.warnings];
+  if (activity.warning) warnings.push(`Commit activity unavailable. ${activity.warning}`);
+  if (participation.warning) warnings.push(`Participation unavailable. ${participation.warning}`);
   return {
-    traffic: { repo, ...traffic },
-    info: info
-      ? {
-          stargazers_count: info.stargazers_count,
-          forks_count: info.forks_count,
-          open_issues_count: info.open_issues_count,
-          description: info.description,
-          html_url: info.html_url,
-          language: info.language,
-          size: info.size,
-          license: info.license?.spdx_id ?? null,
-          topics: info.topics ?? [],
-          created_at: info.created_at,
-          pushed_at: info.pushed_at,
-          has_pages: info.has_pages,
-          has_wiki: info.has_wiki,
-          default_branch: info.default_branch,
-          watchers_count: info.watchers_count,
-          subscribers_count: info.subscribers_count,
-        }
-      : {
-          stargazers_count: 0, forks_count: 0, open_issues_count: 0,
-          description: null, html_url: `https://github.com/${owner}/${repo}`,
-          language: null, size: 0, license: null, topics: [],
-          created_at: "", pushed_at: "", has_pages: false, has_wiki: false,
-          default_branch: "main", watchers_count: 0, subscribers_count: 0,
-        },
-    commitActivity,
-    participation,
+    traffic,
+    warnings,
+    statisticsPending: activity.pending || participation.pending,
+    info: {
+      stargazers_count: info.stargazers_count,
+      forks_count: info.forks_count,
+      open_issues_count: info.open_issues_count,
+      description: info.description,
+      html_url: info.html_url,
+      language: info.language,
+      size: info.size,
+      license: info.license?.spdx_id ?? null,
+      topics: info.topics ?? [],
+      created_at: info.created_at,
+      pushed_at: info.pushed_at,
+      has_pages: info.has_pages,
+      has_wiki: info.has_wiki,
+      default_branch: info.default_branch,
+      watchers_count: info.watchers_count,
+      subscribers_count: info.subscribers_count,
+    },
+    commitActivity: activity.value ?? [],
+    participation: participation.value,
   };
 }
 
@@ -220,43 +240,46 @@ export async function fetchRepoDetail(
 export async function fetchDashboardData(
   token: string,
   onProgress?: (msg: string) => void,
+  signal?: AbortSignal,
 ): Promise<DashboardData> {
+  const client = createGitHubClient(token, signal);
+  const warnings: string[] = [];
   onProgress?.("Fetching profile...");
-  const user = await ghFetch<GitHubUser>("/user", token);
+  const user = await client.request<GitHubUser>("/user");
+
+  onProgress?.("Fetching repositories...");
+  const rawRepos = await fetchAllRepos(client);
+  const ownedRepos = rawRepos.filter((r) => !r.fork && !r.archived);
 
   onProgress?.("Fetching profile stats...");
   let profile: FullProfileStats | null = null;
   try {
-    profile = await fetchFullProfile(user.login, token);
-  } catch {
-    // GraphQL may fail for some users, continue without full stats
+    profile = await fullProfile(user.login, client);
+  } catch (error) {
+    throwIfAborted(signal);
+    warnings.push(`Profile statistics unavailable. ${errorMessage(error)}`);
   }
-
-  onProgress?.("Fetching repositories...");
-  const rawRepos = await fetchAllRepos(token);
-  const ownedRepos = rawRepos.filter((r) => !r.fork && !r.archived);
 
   onProgress?.(`Fetching traffic for ${ownedRepos.length} repos...`);
 
   // Batch traffic fetches (5 at a time to avoid rate limits)
-  const trafficResults: {
-    repo: string;
-    views: TrafficData;
-    clones: CloneData;
-    referrers: Referrer[];
-  }[] = [];
+  const trafficResults: RepoTraffic[] = [];
 
   const batchSize = 5;
   for (let i = 0; i < ownedRepos.length; i += batchSize) {
+    throwIfAborted(signal);
+    if (client.rateLimited) {
+      const warning = "Remaining traffic unavailable because GitHub rate limited this refresh.";
+      warnings.push(warning);
+      trafficResults.push(...ownedRepos.slice(i).map((repo) => unavailableTraffic(repo.name, warning)));
+      break;
+    }
     const batch = ownedRepos.slice(i, i + batchSize);
     onProgress?.(
       `Fetching traffic ${i + 1}-${Math.min(i + batchSize, ownedRepos.length)} of ${ownedRepos.length}...`,
     );
     const results = await Promise.all(
-      batch.map(async (r) => ({
-        repo: r.name,
-        ...(await fetchRepoTraffic(user.login, r.name, token)),
-      })),
+      batch.map((r) => fetchRepoTraffic(user.login, r.name, client, signal)),
     );
     trafficResults.push(...results);
   }
@@ -276,23 +299,25 @@ export async function fetchDashboardData(
       archived: r.archived,
       description: r.description,
       updated_at: r.updated_at,
-      totalViews: traffic?.views.count ?? 0,
-      totalClones: traffic?.clones.count ?? 0,
-      uniqueVisitors: traffic?.views.uniques ?? 0,
+      totalViews: traffic?.views.status === "ok" ? traffic.views.count : null,
+      totalClones: traffic?.clones.status === "ok" ? traffic.clones.count : null,
+      uniqueVisitors: traffic?.views.status === "ok" ? traffic.views.uniques : null,
     };
   });
 
   // Aggregate totals
-  const totalViews = trafficResults.reduce((s, t) => s + t.views.count, 0);
-  const totalUniqueVisitors = trafficResults.reduce((s, t) => s + t.views.uniques, 0);
-  const totalClones = trafficResults.reduce((s, t) => s + t.clones.count, 0);
-  const totalUniqueCloners = trafficResults.reduce((s, t) => s + t.clones.uniques, 0);
+  const availableViews = trafficResults.filter((t) => t.views.status === "ok");
+  const availableClones = trafficResults.filter((t) => t.clones.status === "ok");
+  const totalViews = availableViews.reduce((s, t) => s + t.views.count, 0);
+  const totalUniqueVisitors = availableViews.reduce((s, t) => s + t.views.uniques, 0);
+  const totalClones = availableClones.reduce((s, t) => s + t.clones.count, 0);
+  const totalUniqueCloners = availableClones.reduce((s, t) => s + t.clones.uniques, 0);
   const totalStars = ownedRepos.reduce((s, r) => s + r.stargazers_count, 0);
   const totalForks = ownedRepos.reduce((s, r) => s + r.forks_count, 0);
 
   // Merge timelines
-  const viewsTimeline = mergeTimelines(trafficResults.map((t) => t.views.views));
-  const clonesTimeline = mergeTimelines(trafficResults.map((t) => t.clones.clones));
+  const viewsTimeline = mergeTimelines(availableViews.map((t) => t.views.views));
+  const clonesTimeline = mergeTimelines(availableClones.map((t) => t.clones.clones));
   const referrers = mergeReferrers(trafficResults.map((t) => t.referrers));
 
   return {
@@ -309,5 +334,7 @@ export async function fetchDashboardData(
     referrers,
     lastSynced: new Date().toISOString(),
     profile,
+    warnings: [...new Set([...warnings, ...trafficResults.flatMap((traffic) => traffic.warnings)])],
+    trafficCoverage: { views: availableViews.length, clones: availableClones.length, total: ownedRepos.length },
   };
 }

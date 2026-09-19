@@ -371,35 +371,71 @@
   100% { background-position: -200% 0; }
 }
 
-/* Dark theme - uses GitHub's data-color-mode attribute */
-[data-color-mode="dark"] .gpi-heatmap-cell[data-level="0"],
-[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="0"] { background: #161b22; }
-[data-color-mode="dark"] .gpi-heatmap-cell[data-level="1"],
-[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="1"] { background: #0e4429; }
-[data-color-mode="dark"] .gpi-heatmap-cell[data-level="2"],
-[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="2"] { background: #006d32; }
-[data-color-mode="dark"] .gpi-heatmap-cell[data-level="3"],
-[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="3"] { background: #26a641; }
-[data-color-mode="dark"] .gpi-heatmap-cell[data-level="4"],
-[data-dark-theme="dark"] .gpi-heatmap-cell[data-level="4"] { background: #39d353; }
-[data-color-mode="dark"] .gpi-weekday-bar,
-[data-dark-theme="dark"] .gpi-weekday-bar { background: #26a641; }
-[data-color-mode="dark"] .gpi-weekday-bar-active,
-[data-dark-theme="dark"] .gpi-weekday-bar-active { background: #58a6ff !important; }
-[data-color-mode="dark"] .gpi-timeline-bar,
-[data-dark-theme="dark"] .gpi-timeline-bar { background: #26a641; }
-[data-color-mode="dark"] .gpi-quick-stat,
-[data-dark-theme="dark"] .gpi-quick-stat { background: #161b22; }
+/* Resolve the active mode, not GitHub's saved preference for a different mode. */
+[data-color-mode="dark"] .gpi-container {
+  --gpi-level-0: #161b22;
+  --gpi-level-1: #0e4429;
+  --gpi-level-2: #006d32;
+  --gpi-level-3: #26a641;
+  --gpi-level-4: #39d353;
+  --gpi-chart-fill: #26a641;
+}
 
-/* Fallback for system preference */
 @media (prefers-color-scheme: dark) {
-  .gpi-heatmap-cell[data-level="0"] { background: #161b22; }
-  .gpi-heatmap-cell[data-level="1"] { background: #0e4429; }
-  .gpi-heatmap-cell[data-level="2"] { background: #006d32; }
-  .gpi-heatmap-cell[data-level="3"] { background: #26a641; }
-  .gpi-heatmap-cell[data-level="4"] { background: #39d353; }
-  .gpi-weekday-bar { background: #26a641; }
-  .gpi-weekday-bar-active { background: #58a6ff !important; }
-  .gpi-timeline-bar { background: #26a641; }
-  .gpi-quick-stat { background: #161b22; }
+  [data-color-mode="auto"] .gpi-container,
+  :root:not([data-color-mode]) .gpi-container {
+    --gpi-level-0: #161b22;
+    --gpi-level-1: #0e4429;
+    --gpi-level-2: #006d32;
+    --gpi-level-3: #26a641;
+    --gpi-level-4: #39d353;
+    --gpi-chart-fill: #26a641;
+  }
+}
+
+.gpi-heatmap-cell[data-level="0"] { background: var(--contribution-default-bgColor-0, var(--gpi-level-0, #ebedf0)); }
+.gpi-heatmap-cell[data-level="1"] { background: var(--contribution-default-bgColor-1, var(--gpi-level-1, #9be9a8)); }
+.gpi-heatmap-cell[data-level="2"] { background: var(--contribution-default-bgColor-2, var(--gpi-level-2, #40c463)); }
+.gpi-heatmap-cell[data-level="3"] { background: var(--contribution-default-bgColor-3, var(--gpi-level-3, #30a14e)); }
+.gpi-heatmap-cell[data-level="4"] { background: var(--contribution-default-bgColor-4, var(--gpi-level-4, #216e39)); }
+.gpi-weekday-bar, .gpi-timeline-bar { background: var(--gpi-chart-fill, #40c463); }
+
+.gpi-container :focus-visible {
+  outline: 2px solid var(--focus-outlineColor, var(--fgColor-accent, #0969da));
+  outline-offset: 2px;
+}
+
+.gpi-lang-bar, .gpi-heatmap, .gpi-weekday-chart, .gpi-timeline { position: relative; }
+.gpi-lang-bar:focus-within, .gpi-heatmap:focus-within { overflow: visible; }
+.gpi-chart-readout {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-radius: 4px;
+  background: var(--bgColor-default, #fff);
+  color: var(--fgColor-default, #24292f);
+  font-size: 11px;
+  line-height: 1.4;
+}
+:focus-within > .gpi-chart-readout { display: block; }
+.gpi-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gpi-container *, .gpi-container *::before, .gpi-container *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -11,9 +11,9 @@ export function LanguagesBar({ languages, totalCount }: LanguagesBarProps) {
   return (
     <div className="p-4 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
       <div className="text-xs font-semibold text-[var(--color-github-muted)] uppercase tracking-wide mb-2">
-        Languages ({totalCount})
+        Languages ({totalCount}) · share of repositories
       </div>
-      <div className="flex h-2.5 rounded overflow-hidden mb-3">
+      <div aria-hidden="true" className="flex h-2.5 rounded overflow-hidden mb-3">
         {languages.map((l) => (
           <div
             key={l.name}
@@ -27,8 +27,8 @@ export function LanguagesBar({ languages, totalCount }: LanguagesBarProps) {
           <span key={l.name} className="text-xs text-[var(--color-github-muted)] flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: l.color }} />
             {l.name}
-            <span className="opacity-60">{l.percentage.toFixed(0)}%</span>
-            <span className="opacity-40">({l.count})</span>
+            <span className="text-[var(--color-github-muted)]">{l.percentage.toFixed(0)}%</span>
+            <span className="text-[var(--color-github-muted)]">({l.count} repos)</span>
           </span>
         ))}
       </div>

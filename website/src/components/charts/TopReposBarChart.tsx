@@ -1,3 +1,4 @@
+import { ChartData } from "./ChartData";
 import {
   BarChart,
   Bar,
@@ -24,17 +25,17 @@ export function TopReposBarChart({
   color = "#238636",
   limit = 10,
 }: TopReposBarChartProps) {
-  const sorted = [...repos]
-    .sort((a, b) => b[dataKey] - a[dataKey])
-    .slice(0, limit)
-    .filter((r) => r[dataKey] > 0);
+  const unavailableCount = repos.filter((repo) => repo[dataKey] === null).length;
+  const sorted = repos.filter((repo) => repo[dataKey] !== null)
+    .sort((a, b) => (b[dataKey] ?? 0) - (a[dataKey] ?? 0))
+    .slice(0, limit);
 
   if (sorted.length === 0) {
     return (
-      <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+      <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
         <h3 className="text-sm font-semibold mb-4">{title}</h3>
         <div className="text-center text-[var(--color-github-muted)] py-8 text-sm">
-          No data available
+          {unavailableCount ? "Traffic unavailable for these repositories" : "No repositories to show"}
         </div>
       </div>
     );
@@ -47,10 +48,10 @@ export function TopReposBarChart({
   };
 
   return (
-    <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+    <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
       <h3 className="text-sm font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={Math.max(200, sorted.length * 36)}>
-        <BarChart data={sorted} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 0 }}>
+        <BarChart accessibilityLayer data={sorted} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#30363d" horizontal={false} />
           <XAxis
             type="number"
@@ -85,6 +86,8 @@ export function TopReposBarChart({
           />
         </BarChart>
       </ResponsiveContainer>
+      {unavailableCount > 0 && <p className="text-xs text-[var(--color-github-muted)] mt-2">Partial data: {unavailableCount} repositories with unavailable traffic are excluded.</p>}
+      <ChartData title={title} columns={["Repository", labelMap[dataKey]]} rows={sorted.map((repo) => [repo.name, repo[dataKey]])} />
     </div>
   );
 }

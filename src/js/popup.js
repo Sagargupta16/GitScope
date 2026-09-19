@@ -5,12 +5,19 @@ import { getSavedToken, clearSavedToken } from "./storage.js";
 const AUTH_URL = "https://gpi-auth.sg85207.workers.dev/login";
 
 async function showSignedIn(token) {
-  const response = await fetch("https://api.github.com/user", {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
+  let response;
+  try {
+    response = await fetch("https://api.github.com/user", {
+      headers: { "Authorization": `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    document.getElementById("signInSection").style.display = "block";
+    return;
+  }
 
   if (!response.ok) {
-    await clearSavedToken();
+    if (response.status === 401) await clearSavedToken();
     document.getElementById("signInSection").style.display = "block";
     return;
   }
@@ -27,9 +34,6 @@ async function showSignedIn(token) {
 document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
 
-  const token = await getSavedToken();
-  if (token) await showSignedIn(token);
-
   document.getElementById("signInBtn").addEventListener("click", () => {
     window.open(AUTH_URL, "gpi_auth", "width=600,height=700");
   });
@@ -39,4 +43,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("signedInSection").style.display = "none";
     document.getElementById("signInSection").style.display = "block";
   });
+  try {
+    const token = await getSavedToken();
+    if (token) await showSignedIn(token);
+  } catch {
+    document.getElementById("signInSection").style.display = "block";
+  }
 });

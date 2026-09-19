@@ -84,12 +84,14 @@ export interface TrafficDay {
 }
 
 export interface TrafficData {
+  status?: "ok" | "unavailable";
   count: number;
   uniques: number;
   views: TrafficDay[];
 }
 
 export interface CloneData {
+  status?: "ok" | "unavailable";
   count: number;
   uniques: number;
   clones: TrafficDay[];
@@ -106,6 +108,7 @@ export interface RepoTraffic {
   views: TrafficData;
   clones: CloneData;
   referrers: Referrer[];
+  warnings: string[];
 }
 
 export interface DashboardRepo {
@@ -119,12 +122,14 @@ export interface DashboardRepo {
   archived: boolean;
   description: string | null;
   updated_at: string;
-  totalViews: number;
-  totalClones: number;
-  uniqueVisitors: number;
+  totalViews: number | null;
+  totalClones: number | null;
+  uniqueVisitors: number | null;
 }
 
 export interface DashboardData {
+  warnings: string[];
+  trafficCoverage: { views: number; clones: number; total: number };
   user: GitHubUser;
   repos: DashboardRepo[];
   totalViews: number;
@@ -156,6 +161,8 @@ export interface ParticipationData {
 
 // Extended repo detail data
 export interface RepoDetailData {
+  warnings: string[];
+  statisticsPending: boolean;
   traffic: RepoTraffic;
   info: {
     stargazers_count: number;

@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: [website/**, docs/**]
+    paths: [website/**, docs/**, .github/workflows/pages.yml, scripts/check-production.mjs]
   workflow_dispatch:
 
 concurrency:
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11
 
@@ -33,11 +33,20 @@ jobs:
           cache: pnpm
           cache-dependency-path: website/pnpm-lock.yaml
 
-      - run: pnpm install --frozen-lockfile
+      # Dependency lifecycle scripts are not needed to build or test this repo,
+      # so skip them rather than run arbitrary install-time code in CI.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
         working-directory: website
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm test
 
       - run: pnpm build
         working-directory: website
+
+      - name: Verify compatible authentication service
+        run: node scripts/check-production.mjs --auth-only
 
       - uses: actions/configure-pages@v6
 

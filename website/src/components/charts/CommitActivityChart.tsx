@@ -1,3 +1,4 @@
+import { ChartData } from "./ChartData";
 import {
   BarChart,
   Bar,
@@ -17,7 +18,7 @@ interface CommitActivityChartProps {
 
 export function CommitActivityChart({
   data,
-  title = "Commit Activity (last year)",
+  title = "Commit Activity (last 52 weeks)",
 }: CommitActivityChartProps) {
   // Filter to non-empty weeks and format
   const formatted = data
@@ -29,7 +30,7 @@ export function CommitActivityChart({
 
   if (formatted.length === 0) {
     return (
-      <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+      <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
         <h3 className="text-sm font-semibold mb-4">{title}</h3>
         <div className="text-center text-[var(--color-github-muted)] py-8 text-sm">
           No commit activity data available
@@ -39,10 +40,10 @@ export function CommitActivityChart({
   }
 
   return (
-    <div className="p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
+    <div className="min-w-0 p-4 sm:p-6 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
       <h3 className="text-sm font-semibold mb-4">{title}</h3>
       <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <BarChart accessibilityLayer data={formatted} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
           <XAxis
             dataKey="week"
@@ -69,6 +70,7 @@ export function CommitActivityChart({
           <Bar dataKey="commits" name="Commits" fill="#238636" radius={[2, 2, 0, 0]} maxBarSize={12} />
         </BarChart>
       </ResponsiveContainer>
+      <ChartData title={title} columns={["Week starting", "Commits"]} rows={data.filter((week) => week.week > 0).map((week) => [format(new Date(week.week * 1000), "yyyy-MM-dd"), week.total])} />
     </div>
   );
 }

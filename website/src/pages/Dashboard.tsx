@@ -1,14 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
-import {
-  getStoredToken,
-  getStoredLogin,
-  storeAuth,
-  clearAuth,
-  getLoginUrl,
-  extractTokenFromHash,
-  fetchAuthenticatedUser,
-} from "../lib/auth";
+import { retryAuth, useAuth } from "../lib/auth";
+import { LoginLink } from "../components/LoginLink";
+import { useRequestGuard, accountCacheKey, readAccountCache, writeAccountCache } from "../components/uiLifecycle";
 import { fetchDashboardData } from "../lib/dashboard";
 import { formatNumber } from "../lib/analytics";
 import type { DashboardData, DashboardRepo } from "../lib/types";
@@ -20,29 +14,7 @@ import { LanguagesBar } from "../components/charts/LanguagesBar";
 
 type RepoSortKey = "totalViews" | "stargazers_count" | "totalClones" | "forks_count";
 
-const CACHE_KEY = "gitscope_dashboard";
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-interface CachedDashboard {
-  data: DashboardData;
-  timestamp: number;
-}
-
-function loadCache(): DashboardData | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const cached: CachedDashboard = JSON.parse(raw);
-    if (Date.now() - cached.timestamp > CACHE_TTL) return null;
-    return cached.data;
-  } catch {
-    return null;
-  }
-}
-
-function saveCache(data: DashboardData) {
-  localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
-}
+const CACHE_TTL = 5 * 60 * 1000;
 
 const SORT_OPTIONS: { key: RepoSortKey; label: string }[] = [
   { key: "totalViews", label: "Views" },
@@ -55,7 +27,7 @@ function RepoRow({ repo, sortBy }: { repo: DashboardRepo; sortBy: RepoSortKey })
   return (
     <Link
       to={`/dashboard/repo/${repo.name}`}
-      className="flex items-center gap-4 px-4 py-3 border-b border-[var(--color-github-border)] last:border-0 bg-[var(--color-github-dark)] hover:bg-[var(--color-github-darker)] transition-colors no-underline text-inherit"
+      className="repo-row flex items-center gap-4 px-4 py-3 border-b border-[var(--color-github-border)] last:border-0 bg-[var(--color-github-dark)] hover:bg-[var(--color-github-darker)] transition-colors no-underline text-inherit"
     >
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-white truncate">{repo.name}</div>
@@ -65,7 +37,7 @@ function RepoRow({ repo, sortBy }: { repo: DashboardRepo; sortBy: RepoSortKey })
           </div>
         )}
       </div>
-      <div className="flex items-center gap-4 shrink-0 text-right">
+      <div className="repo-metrics flex items-center gap-4 shrink-0 text-right">
         {repo.language && (
           <span className="text-xs text-[var(--color-github-muted)] hidden sm:inline">
             {repo.language}
@@ -85,13 +57,13 @@ function RepoRow({ repo, sortBy }: { repo: DashboardRepo; sortBy: RepoSortKey })
         </div>
         <div className="text-center min-w-[50px]">
           <div className={`text-sm font-semibold ${sortBy === "totalViews" ? "text-[var(--color-brand)]" : ""}`}>
-            {formatNumber(repo.totalViews)}
+            {repo.totalViews === null ? "Unavailable" : formatNumber(repo.totalViews)}
           </div>
           <div className="text-[10px] text-[var(--color-github-muted)]">views</div>
         </div>
         <div className="text-center min-w-[50px]">
           <div className={`text-sm font-semibold ${sortBy === "totalClones" ? "text-[var(--color-brand)]" : ""}`}>
-            {formatNumber(repo.totalClones)}
+            {repo.totalClones === null ? "Unavailable" : formatNumber(repo.totalClones)}
           </div>
           <div className="text-[10px] text-[var(--color-github-muted)]">clones</div>
         </div>
@@ -104,102 +76,94 @@ function RepoRow({ repo, sortBy }: { repo: DashboardRepo; sortBy: RepoSortKey })
 }
 
 export function Dashboard() {
-  const [token, setToken] = useState<string | null>(getStoredToken);
-  const [viewerLogin, setViewerLogin] = useState<string | null>(getStoredLogin);
+  const { token, login: viewerLogin, scopes, loading: authLoading, error: authError, signOut } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<RepoSortKey>("totalViews");
-  const loadedRef = useRef(false);
-
-  // Handle OAuth redirect
-  useEffect(() => {
-    const hashToken = extractTokenFromHash();
-    if (hashToken) {
-      setToken(hashToken);
-      fetchAuthenticatedUser(hashToken).then((login) => {
-        storeAuth(hashToken, login);
-        setViewerLogin(login);
-      }).catch(() => {
-        setError("Invalid token received. Please try signing in again.");
-      });
-    }
-
-    const hash = globalThis.location.hash;
-    if (hash.includes("error=auth_failed")) {
-      setError("Authentication failed. Please try again.");
-      globalThis.history.replaceState(null, "", globalThis.location.pathname);
-    }
-  }, []);
+  const { start, cancel, session } = useRequestGuard(token, viewerLogin);
+  const trafficAccess = scopes.includes("repo");
 
   const loadDashboard = useCallback(async (forceRefresh = false) => {
-    if (!token) return;
-
+    if (authLoading || !token || !viewerLogin || !trafficAccess) return;
+    const request = start();
+    const key = accountCacheKey("dashboard", viewerLogin, session);
+    setError(null);
     if (!forceRefresh) {
-      const cached = loadCache();
-      if (cached) {
+      const cached = readAccountCache<DashboardData>(key, viewerLogin, session, CACHE_TTL);
+      if (cached && cached.user?.login?.toLowerCase() === viewerLogin.toLowerCase() && cached.trafficCoverage && cached.warnings) {
         setData(cached);
+        setLoading(false);
         return;
       }
     }
-
     setLoading(true);
-    setError(null);
-
+    setProgress("Fetching dashboard…");
     try {
-      const result = await fetchDashboardData(token, setProgress);
+      const result = await fetchDashboardData(token, (message) => { if (request.current()) setProgress(message); }, request.signal);
+      if (!request.current()) return;
+      if (result.user.login.toLowerCase() !== viewerLogin.toLowerCase()) throw new Error("Your account changed. Please sign in again.");
       setData(result);
-      saveCache(result);
-      setProgress("");
+      writeAccountCache(key, viewerLogin, session, result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load dashboard data");
+      if (request.current()) setError(err instanceof Error ? err.message : "Failed to load dashboard data");
     } finally {
-      setLoading(false);
+      if (request.current()) { setLoading(false); setProgress(""); }
     }
-  }, [token]);
+  }, [authLoading, token, viewerLogin, trafficAccess, session, start]);
 
-  // Auto-load on auth
   useEffect(() => {
-    if (token && !loadedRef.current) {
-      loadedRef.current = true;
-      loadDashboard();
-    }
-  }, [token, loadDashboard]);
+    setData(null);
+    void loadDashboard();
+    return cancel;
+  }, [loadDashboard, cancel]);
 
   function handleSignOut() {
-    clearAuth();
-    localStorage.removeItem(CACHE_KEY);
-    setToken(null);
-    setViewerLogin(null);
+    cancel();
     setData(null);
-    loadedRef.current = false;
+    setError(null);
+    signOut();
   }
 
-  function handleSync() {
-    localStorage.removeItem(CACHE_KEY);
-    loadDashboard(true);
-  }
+  function handleSync() { void loadDashboard(true); }
+
+  const authNotice = authError && (
+    <div className="my-4 text-center">
+      <p role="alert" className="text-red-400 mb-2">{authError}</p>
+      <button type="button" onClick={() => void retryAuth()} disabled={authLoading}
+        className="text-sm text-[var(--color-brand-light)] underline disabled:opacity-50">
+        Retry verification
+      </button>
+    </div>
+  );
+
+  if (authLoading) return <div className="py-20 px-6 text-center">
+    <p role="status" aria-live="polite">Checking sign-in…</p>
+    {authNotice}
+  </div>;
 
   // Not authenticated
-  if (!token) {
+  if (!token || !trafficAccess) {
     return (
       <section className="py-20 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
           <p className="text-[var(--color-github-muted)] mb-2">
-            See your GitHub traffic, star trends, and repo analytics in one place.
+            See your GitHub traffic, star totals, and repo analytics in one place.
           </p>
           <p className="text-xs text-[var(--color-github-muted)] mb-8">
-            Requires <code className="bg-[var(--color-github-dark)] px-1 rounded">repo</code> scope
-            to read traffic data. GitScope only reads traffic stats -- it never writes to your repos.
+            Traffic analytics requires <code className="bg-[var(--color-github-dark)] px-1 rounded">repo</code> scope
+            to read traffic data. GitHub grants this scope broad repository access, including private repositories. GitScope uses it to read analytics.
           </p>
-          <a
-            href={getLoginUrl()}
+          <LoginLink
+            traffic={Boolean(token)} returnTo="/dashboard"
             className="inline-block bg-[var(--color-brand)] hover:bg-[var(--color-brand-light)] text-white px-6 py-3 rounded-lg font-semibold no-underline transition-colors"
           >
-            Sign in with GitHub
-          </a>
+            {token ? "Enable traffic analytics" : "Sign in with GitHub"}
+          </LoginLink>
+          {authNotice}
+          {token && <button onClick={handleSignOut} className="block mx-auto mt-4 text-sm">Sign out</button>}
         </div>
       </section>
     );
@@ -211,7 +175,9 @@ export function Dashboard() {
       <section className="py-20 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <div className="inline-block w-8 h-8 border-2 border-[var(--color-github-border)] border-t-[var(--color-brand)] rounded-full animate-spin mb-4" />
-          <p className="text-[var(--color-github-muted)] text-sm">{progress}</p>
+          <p role="status" aria-live="polite" className="text-[var(--color-github-muted)] text-sm">{progress}</p>
+          {authNotice}
+          <button onClick={handleSignOut} className="mt-4 text-sm">Sign out</button>
         </div>
       </section>
     );
@@ -222,7 +188,8 @@ export function Dashboard() {
     return (
       <section className="py-20 px-6">
         <div className="max-w-2xl mx-auto text-center">
-          <div className="text-red-400 mb-6 p-4 rounded-lg border border-red-900 bg-red-950/30">
+          {authNotice}
+          <div role="alert" className="text-red-400 mb-6 p-4 rounded-lg border border-red-900 bg-red-950/30">
             {error}
           </div>
           <button
@@ -231,29 +198,31 @@ export function Dashboard() {
           >
             Try again
           </button>
+          <button onClick={handleSignOut} className="ml-4 text-sm">Sign out</button>
         </div>
       </section>
     );
   }
 
-  if (!data) return null;
+  if (!data) return authNotice;
 
-  const sortedRepos = [...data.repos].sort((a, b) => b[sortBy] - a[sortBy]);
+  const sortedRepos = [...data.repos].sort((a, b) => (b[sortBy] ?? -1) - (a[sortBy] ?? -1));
   const joinYear = new Date(data.user.created_at).getFullYear();
   const accountAge = new Date().getFullYear() - joinYear;
 
   return (
     <section className="py-8 px-6">
       <div className="max-w-5xl mx-auto">
+        {authNotice}
         {/* Header */}
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 min-w-0">
             <img
               src={data.user.avatar_url}
               alt={data.user.login}
               className="w-14 h-14 rounded-full"
             />
-            <div>
+            <div className="min-w-0 break-words">
               <h1 className="text-2xl font-bold">{data.user.name || data.user.login}</h1>
               <div className="text-sm text-[var(--color-github-muted)]">
                 @{data.user.login} &middot; {data.user.public_repos} repos &middot; {data.user.followers} followers &middot; {accountAge}yr
@@ -279,8 +248,8 @@ export function Dashboard() {
         {/* Profile stats (from GraphQL) */}
         {data.profile && (
           <div className="rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)] p-4 mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <div className="flex items-center flex-wrap gap-3">
                 <span className="text-sm font-semibold">{data.profile.personality.label}</span>
                 <span className="text-xs text-[var(--color-github-muted)]">{data.profile.personality.description}</span>
               </div>
@@ -297,7 +266,7 @@ export function Dashboard() {
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
               <div className="text-center">
                 <div className="text-lg font-bold">{formatNumber(data.profile.totalContributions)}</div>
-                <div className="text-[10px] text-[var(--color-github-muted)]">This Year</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Rolling year</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold">{data.profile.currentStreak}d</div>
@@ -321,7 +290,7 @@ export function Dashboard() {
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold">{data.profile.avgPerDay}</div>
-                <div className="text-[10px] text-[var(--color-github-muted)]">Avg/Day</div>
+                <div className="text-[10px] text-[var(--color-github-muted)]">Avg/active day</div>
               </div>
               <div className="text-center">
                 <div className="text-lg font-bold">{data.profile.weekendPct}%</div>
@@ -346,17 +315,24 @@ export function Dashboard() {
           </div>
         )}
 
+        <div role="status" aria-live="polite" className="text-sm text-[var(--color-github-muted)] mb-4">
+          {(data.trafficCoverage.views < data.trafficCoverage.total || data.trafficCoverage.clones < data.trafficCoverage.total) && <strong>Partial traffic data. </strong>}
+          Views available for {data.trafficCoverage.views} of {data.trafficCoverage.total} repositories;
+          clones for {data.trafficCoverage.clones} of {data.trafficCoverage.total}. Totals cover available data only.
+          Unique counts are summed across repositories; people visiting multiple repositories can be counted more than once.
+          {data.warnings.length > 0 && <ul className="mt-2 list-disc pl-5">{data.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul>}
+        </div>
         {/* Traffic stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
             label="Views (14d)"
-            value={formatNumber(data.totalViews)}
-            subValue={`${formatNumber(data.totalUniqueVisitors)} unique visitors`}
+            value={data.trafficCoverage.views ? formatNumber(data.totalViews) : "Unavailable"}
+            subValue={data.trafficCoverage.views ? `${formatNumber(data.totalUniqueVisitors)} sum of repository uniques` : "No repository traffic available"}
           />
           <StatCard
             label="Clones (14d)"
-            value={formatNumber(data.totalClones)}
-            subValue={`${formatNumber(data.totalUniqueCloners)} unique cloners`}
+            value={data.trafficCoverage.clones ? formatNumber(data.totalClones) : "Unavailable"}
+            subValue={data.trafficCoverage.clones ? `${formatNumber(data.totalUniqueCloners)} sum of repository uniques` : "No repository traffic available"}
           />
           <StatCard
             label="Total Stars"
@@ -372,8 +348,10 @@ export function Dashboard() {
 
         {/* Traffic charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          <TrafficAreaChart data={data.viewsTimeline} title="Views (last 14 days)" />
+          <TrafficAreaChart unavailable={data.trafficCoverage.total > 0 && data.trafficCoverage.views === 0} uniqueLabel="Sum of repository uniques" data={data.viewsTimeline} title="Views (last 14 days)" />
           <TrafficAreaChart
+            unavailable={data.trafficCoverage.total > 0 && data.trafficCoverage.clones === 0}
+            uniqueLabel="Sum of repository uniques"
             data={data.clonesTimeline}
             title="Clones (last 14 days)"
             color="#da3633"
@@ -384,7 +362,7 @@ export function Dashboard() {
         {/* Top repos + referrers */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           <TopReposBarChart repos={data.repos} dataKey="totalViews" title="Top Repos by Views" />
-          <ReferrersChart referrers={data.referrers} />
+          <ReferrersChart uniqueLabel="Sum of repository uniques" referrers={data.referrers} />
         </div>
 
         {/* Star chart */}
@@ -400,7 +378,7 @@ export function Dashboard() {
         {/* Repository list */}
         <div className="rounded-lg border border-[var(--color-github-border)] overflow-hidden mb-4">
           {/* List header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-[var(--color-github-darker)] border-b border-[var(--color-github-border)]">
+          <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-3 bg-[var(--color-github-darker)] border-b border-[var(--color-github-border)]">
             <h2 className="text-sm font-semibold">Repositories ({data.repos.length})</h2>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-[var(--color-github-muted)]">Sort:</span>
@@ -408,6 +386,7 @@ export function Dashboard() {
                 <button
                   key={key}
                   onClick={() => setSortBy(key)}
+                  aria-pressed={sortBy === key}
                   className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
                     sortBy === key
                       ? "border-[var(--color-brand)] text-[var(--color-brand)] bg-[var(--color-brand)]/10"
@@ -419,6 +398,7 @@ export function Dashboard() {
               ))}
             </div>
           </div>
+          {sortedRepos.length === 0 && <p className="p-4 text-sm text-[var(--color-github-muted)]">No active, original repositories to show.</p>}
           {sortedRepos.map((repo) => (
             <RepoRow key={repo.name} repo={repo} sortBy={sortBy} />
           ))}

@@ -51,7 +51,27 @@ Thanks for your interest in contributing!
 ### Worker
 
 - Run `cd worker && npx wrangler dev` for local testing
-- Handles both extension and website OAuth flows via the `state` parameter
+- Handles extension and website OAuth with a signed browser cookie; the website also checks a tab-specific login nonce
+
+### Checks before release
+
+Use Node 24 and pnpm 11. From the repository root:
+
+```bash
+npm ci
+pnpm --dir website install --frozen-lockfile
+npm test
+npm run typecheck
+npm run build
+npm run build:worker
+pnpm --dir website build
+```
+
+Deploy the compatible OAuth Worker before the clients, then run `npm run check:auth`.
+After Pages deploys, run `npm run check:production` with `EXPECTED_SHA` set to the
+deployed commit. Release readiness checks Chrome Web Store access without
+publishing. The release workflow submits the same tested zip attached to the
+GitHub Release; confirm the public store version after review before calling it published.
 
 ## Pull Requests
 

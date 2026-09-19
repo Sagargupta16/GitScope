@@ -34,17 +34,42 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 11
 
       - uses: actions/setup-node@v7
         with:
           node-version: 24
 
-      - run: npm ci
+      # Dependency lifecycle scripts are not needed to build or test this repo,
+      # so skip them rather than run arbitrary install-time code in a release.
+      - run: npm ci --ignore-scripts
+
+      - run: pnpm --dir website install --frozen-lockfile --ignore-scripts
+
+      - run: npm test
+
+      - run: npm run typecheck
 
       - run: npm run build
 
+      - run: npm run build:worker
+
+      - name: Verify compatible authentication service
+        run: node scripts/check-production.mjs --auth-only
+
       - name: Create zip artifact
         run: cd dist && zip -r ../gitscope-${{ needs.release-please.outputs.tag_name }}.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-extension
+          path: gitscope-${{ needs.release-please.outputs.tag_name }}.zip
+          if-no-files-found: error
 
       - name: Attach build to GitHub Release
         uses: softprops/action-gh-release@v3
@@ -57,54 +82,23 @@ jobs:
     needs: [release-please, build-and-release]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 24
+          name: release-extension
 
-      - run: npm ci
-
-      - run: npm run build
-
-      - name: Create zip
-        run: cd dist && zip -r ../gitscope.zip .
-
-      # Non-blocking on purpose, and this is the one step here that talks to an
-      # external account we cannot re-authorise from CI.
-      #
-      # The v1.2.1 run (2026-09-03) failed with `HTTPError: Response code 400`
-      # during "Setting up auth". All four CHROME_* secrets exist, so this is a
-      # rejected credential rather than a missing one -- Chrome Web Store refresh
-      # tokens get revoked (unused for months, OAuth client rotated, or the
-      # consent screen changed). Nothing in the repo can fix that.
-      #
-      # Everything that matters for a release already succeeded by this point:
-      # release-please tagged it, and build-and-release attached the zip to the
-      # GitHub Release. Failing the whole workflow on the store upload turned a
-      # successful release red and buried that fact, so the upload now reports
-      # loudly and lets the run pass.
-      #
-      # TO RESTORE BLOCKING BEHAVIOUR FOR PRODUCTION:
-      #   1. Regenerate the refresh token via the Chrome Web Store API OAuth
-      #      flow and update the CHROME_REFRESH_TOKEN secret.
-      #   2. Confirm a release publishes end to end.
-      #   3. Delete the `continue-on-error` line below and the reporting step
-      #      that follows it. That is the whole revert.
+      # A release is not fully published when the store rejects the upload.
       - name: Upload to Chrome Web Store
         id: chrome-upload
-        continue-on-error: true
         uses: mnao305/chrome-extension-upload@v6.0.0
         with:
-          file-path: gitscope.zip
+          file-path: gitscope-${{ needs.release-please.outputs.tag_name }}.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
           client-id: ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
           publish: true
 
-      # Keeps a skipped publish visible. Without this the run is green and the
-      # store silently never receives the build.
+      # Store review can remain pending after the publish request succeeds.
       - name: Report store upload outcome
         if: always()
         env:
@@ -114,22 +108,19 @@ jobs:
           set -euo pipefail
 
           if [ "${OUTCOME}" = "success" ]; then
-            echo "Published ${TAG} to the Chrome Web Store."
-            echo "Published \`${TAG}\` to the Chrome Web Store." >> "$GITHUB_STEP_SUMMARY"
+            echo "Submitted ${TAG} to the Chrome Web Store."
+            echo "Submitted \`${TAG}\` to the Chrome Web Store. Confirm the public listing version after store review." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          echo "::warning::Chrome Web Store upload did not succeed (${OUTCOME})." \
-            "The GitHub Release for ${TAG} is complete and the zip is attached," \
-            "but the store still needs the build. Most likely CHROME_REFRESH_TOKEN" \
-            "has been revoked and needs regenerating."
+          echo "::error::Chrome Web Store submission did not succeed (${OUTCOME}). Check the upload step for the cause."
           {
-            echo "### Chrome Web Store upload skipped"
+            echo "### Chrome Web Store submission failed"
             echo
             echo "Release \`${TAG}\` is tagged and the zip is attached to the GitHub Release."
             echo "The store upload reported \`${OUTCOME}\`, so **the extension was not published**."
             echo
-            echo "Most likely cause: \`CHROME_REFRESH_TOKEN\` was revoked. Regenerate it, or"
-            echo "upload \`gitscope.zip\` by hand from the"
+            echo "Check the upload error and release credentials, or upload the exact release zip from the"
             echo "[Developer Dashboard](https://chrome.google.com/webstore/devconsole)."
           } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

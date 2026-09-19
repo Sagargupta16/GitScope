@@ -1,50 +1,182 @@
-const TOKEN_KEY = "gitscope_token";
-const LOGIN_KEY = "gitscope_login";
+import { useSyncExternalStore } from "react";
+
+const AUTH_KEY = "gitscope_auth_v2";
+const PENDING_KEY = "gitscope_oauth_pending";
+const SIGNOUT_KEY = "gitscope_signout";
 const WORKER_URL = "https://gpi-auth.sg85207.workers.dev";
+interface StoredAuth { token: string; login: string; scopes: string[]; sessionId: string }
+interface AuthState { token: string | null; login: string | null; scopes: string[]; loading: boolean; error: string | null; retryable: boolean; signOut: () => void }
+export interface LoginOptions { traffic?: boolean; returnTo?: "compare" | "leaderboard" | "dashboard" }
+const listeners = new Set<() => void>();
+let generation = 0;
+let sessionId = "";
+let initialized: Promise<void> | null = null;
+let pendingVerification: string | null = null;
+let snapshot: AuthState = { token: null, login: null, scopes: [], loading: true, error: null, retryable: false, signOut: () => clearAuth() };
 
-export function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+function update(patch: Partial<AuthState>) {
+  snapshot = { ...snapshot, ...patch };
+  for (const listener of listeners) listener();
 }
-
-export function getStoredLogin(): string | null {
-  return localStorage.getItem(LOGIN_KEY);
+function stored(): StoredAuth | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(AUTH_KEY) || "null");
+    return value && typeof value.token === "string" && value.token &&
+      typeof value.login === "string" && value.login &&
+      Array.isArray(value.scopes) && value.scopes.every((scope: unknown) => typeof scope === "string") ? value : null;
+  } catch { return null; }
 }
-
-export function storeAuth(token: string, login: string) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(LOGIN_KEY, login);
+// Storage is a trust boundary. Callers match OAuth state and confirm the token
+// with GitHub before storing it, so a value here that does not look like a
+// credential is a bug or a poisoning attempt: refuse it instead of persisting it.
+const CREDENTIAL = /^[\w.~-]{1,255}$/;
+const SCOPE = /^[\w:.~-]{1,64}$/;
+// Scopes are compared as a sorted join, so the order only has to be stable.
+const byValue = (a: string, b: string) => a.localeCompare(b);
+// Returns the matched value itself, so what gets persisted is the validated
+// substring rather than the caller's string.
+function allowed(value: unknown, pattern: RegExp): string | null {
+  return typeof value === "string" ? pattern.exec(value)?.[0] ?? null : null;
 }
-
-export function clearAuth() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(LOGIN_KEY);
-}
-
-export function getLoginUrl(): string {
-  return `${WORKER_URL}/web/login`;
-}
-
-// Extract token from URL hash after OAuth redirect
-export function extractTokenFromHash(): string | null {
-  const hash = window.location.hash;
-  if (!hash) return null;
-
-  const params = new URLSearchParams(hash.slice(1));
-  const token = params.get("token");
-
-  if (token) {
-    // Clean the hash from URL
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+function clearCachedData() {
+  for (const storage of [localStorage, sessionStorage]) {
+    try {
+      for (let i = storage.length - 1; i >= 0; i--) {
+        const key = storage.key(i);
+        if (key?.startsWith("gitscope_")) storage.removeItem(key);
+      }
+    } catch { /* Storage can be disabled; in-memory sign-out still takes effect. */ }
   }
-
-  return token;
+}
+export function getStoredToken(): string | null { return snapshot.token || stored()?.token || null; }
+export function getStoredLogin(): string | null { return snapshot.login || stored()?.login || null; }
+export function getAuthSessionId(): string { return sessionId; }
+export function storeAuth(token: string, login: string, scopes: string[] = []) {
+  const safeToken = allowed(token, CREDENTIAL);
+  const safeLogin = allowed(login, CREDENTIAL);
+  const safeScopes = scopes.map((scope) => allowed(scope, SCOPE)).filter((scope): scope is string => scope !== null);
+  if (!safeToken || !safeLogin || safeScopes.length !== scopes.length) {
+    clearAuth(false);
+    update({ error: "GitHub returned an unreadable sign-in. Please try again.", retryable: true });
+    return;
+  }
+  const previous = stored();
+  const sameSession = previous?.token === safeToken && previous.login === safeLogin &&
+    [...previous.scopes].sort(byValue).join(",") === [...safeScopes].sort(byValue).join(",");
+  generation++;
+  pendingVerification = null;
+  if (!sameSession) clearCachedData();
+  sessionId = sameSession && previous.sessionId ? previous.sessionId : crypto.randomUUID();
+  try { sessionStorage.setItem(AUTH_KEY, JSON.stringify({ token: safeToken, login: safeLogin, scopes: safeScopes, sessionId })); } catch { /* Current tab still works without persistence. */ }
+  update({ token: safeToken, login: safeLogin, scopes: safeScopes, loading: false, error: null, retryable: false });
+}
+export function clearAuth(broadcast = true) {
+  generation++;
+  pendingVerification = null;
+  sessionId = crypto.randomUUID();
+  clearCachedData();
+  update({ token: null, login: null, scopes: [], loading: false, error: null, retryable: false });
+  if (broadcast) {
+    try { localStorage.setItem(SIGNOUT_KEY, sessionId); } catch { /* Optional cross-tab notification. */ }
+  }
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key === SIGNOUT_KEY && event.newValue) clearAuth(false);
+  });
+}
+export function getLoginUrl(options: LoginOptions = {}): string {
+  const url = new URL(`${WORKER_URL}/web/login`);
+  url.searchParams.set("return_to", options.returnTo || "leaderboard");
+  if (options.traffic) url.searchParams.set("traffic", "1");
+  return url.toString();
+}
+export function beginLogin(options: LoginOptions = {}) {
+  const state = [...crypto.getRandomValues(new Uint8Array(32))].map(n => n.toString(16).padStart(2, "0")).join("");
+  try {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ state, expires: Date.now() + 600_000 }));
+  } catch {
+    update({ error: "Enable session storage in this browser to sign in securely.", retryable: false });
+    return;
+  }
+  const url = new URL(getLoginUrl(options));
+  url.searchParams.set("client_state", state);
+  window.location.assign(url.toString());
 }
 
-export async function fetchAuthenticatedUser(token: string): Promise<string> {
+class IdentityError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+async function identity(token: string): Promise<{ login: string; scopes: string[] }> {
   const res = await fetch("https://api.github.com/user", {
-    headers: { Authorization: `bearer ${token}` },
+    headers: { Authorization: `bearer ${token}`, Accept: "application/vnd.github+json" },
+    signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) throw new Error("Invalid token");
+  if (!res.ok) throw new IdentityError(res.status === 401 ? "Your sign-in has expired. Please sign in again." : "Could not verify your GitHub sign-in. Please try again.", res.status);
   const data = await res.json();
-  return data.login;
+  if (typeof data.login !== "string") throw new Error("GitHub returned an invalid profile.");
+  return { login: data.login, scopes: (res.headers.get("x-oauth-scopes") || "").split(/[ ,]+/).filter(Boolean) };
+}
+export async function fetchAuthenticatedUser(token: string): Promise<string> { return (await identity(token)).login; }
+
+export function initializeAuth(): Promise<void> {
+  if (initialized) return initialized;
+  initialized = (async () => {
+    const requestGeneration = generation;
+    const previous = stored();
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const hasCallback = params.has("token") || params.has("error");
+    let candidate: string | null = null;
+    try {
+      if (hasCallback) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
+        sessionStorage.removeItem(PENDING_KEY);
+        if (!pending || !Number.isFinite(pending.expires) || pending.expires < Date.now() || !params.get("state") || params.get("state") !== pending.state) {
+          throw new Error("This sign-in does not match this tab. Please start sign-in again.");
+        }
+        if (params.has("error")) throw new Error("GitHub sign-in was cancelled or failed. Please try again.");
+        candidate = params.get("token");
+        // Keep a validated callback available for retry without leaving it in the URL.
+        pendingVerification = candidate;
+      } else {
+        candidate = pendingVerification || previous?.token || localStorage.getItem("gitscope_token");
+      }
+      if (!candidate) { update({ loading: false }); return; }
+      const user = await identity(candidate);
+      if (generation !== requestGeneration) return;
+      try {
+        localStorage.removeItem("gitscope_token");
+        localStorage.removeItem("gitscope_login");
+      } catch { /* A verified session can still be used if legacy storage is unavailable. */ }
+      storeAuth(candidate, user.login, user.scopes);
+    } catch (error) {
+      if (generation !== requestGeneration) return;
+      const invalidToken = error instanceof IdentityError && error.status === 401;
+      if (invalidToken) pendingVerification = null;
+      if (invalidToken && (!previous || candidate === previous.token)) {
+        clearAuth(false);
+      } else if (previous) {
+        sessionId = previous.sessionId || crypto.randomUUID();
+        update({ token: previous.token, login: previous.login, scopes: previous.scopes });
+      }
+      update({
+        error: error instanceof Error ? error.message : "Sign-in failed. Please try again.",
+        loading: false,
+        retryable: Boolean(candidate) && !invalidToken,
+      });
+    }
+  })();
+  return initialized;
+}
+
+export function retryAuth(): Promise<void> {
+  if (snapshot.loading && initialized) return initialized;
+  initialized = null;
+  update({ loading: true, error: null, retryable: false });
+  return initializeAuth();
+}
+
+export function useAuth(): AuthState {
+  return useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener); }, () => snapshot, () => snapshot);
 }

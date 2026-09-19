@@ -4,8 +4,32 @@ on:
     branches: [main]
   pull_request:
 jobs:
-  build:
-    uses: Sagargupta16/shared-workflows/.github/workflows/node-ci.yml@main
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 11
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      # Dependency lifecycle scripts are not needed to build or test this repo,
+      # so skip them rather than run arbitrary install-time code in CI.
+      - run: npm ci --ignore-scripts
+      - run: pnpm --dir website install --frozen-lockfile --ignore-scripts
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run build:worker
+      - run: pnpm --dir website build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-extension
+          path: dist
   security:
     uses: Sagargupta16/shared-workflows/.github/workflows/security-scan.yml@main
     permissions:

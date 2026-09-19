@@ -41,7 +41,7 @@
 
 ### Website ([sagargupta16.github.io/GitScope](https://sagargupta16.github.io/GitScope/))
 
-- **Dashboard** - Personal analytics dashboard with traffic data (views, clones, referrers), star/fork trends, and per-repo drill-down. Requires GitHub OAuth with `repo` scope for traffic API access.
+- **Dashboard** - Personal analytics dashboard with traffic data (views, clones, referrers), current star/fork totals, and per-repo drill-down. Requires GitHub OAuth with `repo` scope for traffic API access.
 - **Repo Detail** - Per-repository traffic charts, referrer breakdown, and stats (views, clones, stars, forks, issues)
 - **Compare Tool** - Side-by-side profile comparison with up to 17 head-to-head stats (PR merge rate, issue close rate, weekend %, contributed to, organizations, and more)
 - **Leaderboard** - Rank yourself against everyone you follow, sortable by stars, repos, followers, forks, or languages
@@ -89,7 +89,7 @@ Injected into GitHub sidebar
     | cached for 5 minutes per profile
 ```
 
-**Authentication** uses GitHub OAuth via a Cloudflare Worker (`worker/`). The worker holds the client secret server-side and exchanges the auth code for a token. No secrets in the extension code.
+**Authentication** uses GitHub OAuth via a Cloudflare Worker (`worker/`). The worker holds the client secret server-side and validates a signed, short-lived browser-bound state cookie before exchanging the code. Website callbacks also verify the pending login in the initiating tab. Basic sign-in requests profile permissions; traffic analytics is a separate permission upgrade.
 
 ## Project Structure
 
@@ -132,7 +132,7 @@ GitScope/
 - **Manifest V3** - Latest Chrome extension API
 - **Vanilla JS** - Zero runtime dependencies
 - **esbuild** - Fast bundler (src/ -> dist/ in <1s)
-- **GitHub GraphQL API** - Single query fetches all profile data
+- **GitHub GraphQL API** - Paginated repositories and bounded contribution windows
 - **CSS Custom Properties** - GitHub's theme variables for automatic light/dark
 
 ### Website
@@ -140,7 +140,7 @@ GitScope/
 - **React 19** + **TypeScript** - Component-based UI
 - **Vite 8** - Build tool with HMR
 - **Tailwind CSS v4** - Utility-first styling
-- **React Router v7** - Client-side routing
+- **React Router** - Client-side routing
 - **Recharts 3** - React charting library for dashboard traffic/star charts
 - **date-fns 4** - Date formatting and manipulation
 - **GitHub REST + GraphQL APIs** - Hybrid auth (basic stats without login, full stats with)
@@ -153,10 +153,10 @@ GitScope/
 
 ## Privacy
 
-- Token stored locally (Chrome storage for extension, localStorage for website)
+- Extension tokens stay in device-local Chrome storage; website tokens stay in tab sessionStorage
 - Client secret stored server-side on Cloudflare Worker
 - API responses cached locally (extension: 5 min, leaderboard: 10 min, dashboard: 5 min)
-- Dashboard requests `repo` scope for traffic API access (read-only -- never writes to repos)
+- Dashboard explicitly requests `repo` scope for traffic access. This GitHub permission is broad; GitScope uses it only for read requests.
 - No analytics, no tracking, no telemetry
 - Source code is fully open and auditable
 
@@ -168,6 +168,9 @@ See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 # Extension
 npm install
 npm run build        # Build to dist/
+npm test             # Regression tests across extension, website, and OAuth
+npm run typecheck    # Website TypeScript validation (install website deps first)
+npm run build:worker # Validate the Worker bundle without deploying
 npm run watch        # Watch mode
 
 # Website
@@ -198,3 +201,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## License
 
 [MIT](LICENSE)
+
+## Data accuracy and release verification
+
+- Contribution totals cover the last 365 calendar days. Current streaks allow an inactive current day, not earlier inactive days. Velocity compares two complete 28-day periods.
+- Language percentages count repositories by primary language. Daily averages are per active day. Repository unique-visitor counts cannot deduplicate a visitor across multiple repositories.
+- Repositories and following lists are paginated. Failed traffic endpoints are marked unavailable; partial totals include coverage and warnings. Failed leaderboard requests do not produce an apparently complete rank.
+- Pull requests test and build the extension, website, and Worker. Trusted pull requests verify Chrome Web Store access without publishing.
+- Deploy the Worker first with `npx wrangler deploy --config worker/wrangler.toml`. `npm run check:auth` verifies the compatible OAuth protocol before client deployment.
+- Release-please manages extension versions. Merge its release PR after the fix PR; a GitHub ZIP and Chrome Web Store publication are separate delivery checks. Failed store uploads fail the release workflow.
+- After Pages deployment, run `npm run check:production` with `EXPECTED_SHA` set to the deployed commit. The check verifies the release marker, entry assets, SPA fallback, and OAuth service.
