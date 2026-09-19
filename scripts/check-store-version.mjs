@@ -27,22 +27,20 @@ if (!tokenResponse.ok) {
 const { access_token: accessToken } = await tokenResponse.json();
 if (!accessToken) throw new Error("Chrome Web Store did not return an access token.");
 
+// v1.1 items.get only supports the DRAFT projection; PUBLISHED returns HTTP 400.
+// That means this API can confirm the release reached the store, but not that the
+// public listing has finished rolling out.
 const item = process.env.CHROME_EXTENSION_ID;
-async function itemState(projection) {
-  const response = await fetch(`https://www.googleapis.com/chromewebstore/v1.1/items/${encodeURIComponent(item)}?projection=${projection}`, {
-    headers: { Authorization: `Bearer ${accessToken}`, "x-goog-api-version": "2" },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`Chrome Web Store ${projection} lookup failed (HTTP ${response.status}).`);
-  return response.json();
-}
+const response = await fetch(`https://www.googleapis.com/chromewebstore/v1.1/items/${encodeURIComponent(item)}?projection=DRAFT`, {
+  headers: { Authorization: `Bearer ${accessToken}`, "x-goog-api-version": "2" },
+  signal: AbortSignal.timeout(20_000),
+});
+if (!response.ok) throw new Error(`Chrome Web Store item lookup failed (HTTP ${response.status}).`);
+const draft = await response.json();
 
-const published = await itemState("PUBLISHED");
-const draft = await itemState("DRAFT");
 // Only echo values the store itself reported, matched against a version shape.
-const version = /^[0-9.]{1,32}$/.exec(String(published.crxVersion ?? ""))?.[0] ?? "unknown";
-const draftVersion = /^[0-9.]{1,32}$/.exec(String(draft.crxVersion ?? ""))?.[0] ?? "unknown";
-console.log(`Chrome Web Store: published ${version}, draft ${draftVersion}, draft state ${draft.uploadState ?? "unknown"}.`);
+const version = /^[0-9.]{1,32}$/.exec(String(draft.crxVersion ?? ""))?.[0] ?? "unknown";
+console.log(`Chrome Web Store: item version ${version}, upload state ${draft.uploadState ?? "unknown"}.`);
 if (draft.itemError?.length) {
   console.log(`Store reported item errors: ${draft.itemError.map((error) => error.error_code ?? "unknown").join(", ")}`);
 }
@@ -50,7 +48,7 @@ if (draft.itemError?.length) {
 const expected = process.argv[2];
 if (expected) {
   if (version !== expected) {
-    throw new Error(`Chrome Web Store published ${version}, expected ${expected}. The release did not reach the public listing.`);
+    throw new Error(`Chrome Web Store holds ${version}, expected ${expected}. The upload did not reach the store.`);
   }
-  console.log(`Verified the public listing serves ${expected}.`);
+  console.log(`Verified the store holds ${expected}. Public rollout follows store review.`);
 }
