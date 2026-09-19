@@ -26,6 +26,14 @@ function stored(): StoredAuth | null {
       Array.isArray(value.scopes) && value.scopes.every((scope: unknown) => typeof scope === "string") ? value : null;
   } catch { return null; }
 }
+// Storage is a trust boundary. Callers match OAuth state and confirm the token
+// with GitHub before storing it, so a value here that does not look like a
+// credential is a bug or a poisoning attempt: refuse it instead of persisting it.
+const CREDENTIAL = /^[\w.~-]{1,255}$/;
+const SCOPE = /^[\w:.~-]{1,64}$/;
+function credentialShape(token: string, login: string, scopes: string[]): boolean {
+  return CREDENTIAL.test(token) && CREDENTIAL.test(login) && scopes.every((scope) => SCOPE.test(scope));
+}
 function clearCachedData() {
   for (const storage of [localStorage, sessionStorage]) {
     try {
@@ -40,6 +48,11 @@ export function getStoredToken(): string | null { return snapshot.token || store
 export function getStoredLogin(): string | null { return snapshot.login || stored()?.login || null; }
 export function getAuthSessionId(): string { return sessionId; }
 export function storeAuth(token: string, login: string, scopes: string[] = []) {
+  if (!credentialShape(token, login, scopes)) {
+    clearAuth(false);
+    update({ error: "GitHub returned an unreadable sign-in. Please try again.", retryable: true });
+    return;
+  }
   const previous = stored();
   const sameSession = previous?.token === token && previous.login === login &&
     [...previous.scopes].sort().join(",") === [...scopes].sort().join(",");
