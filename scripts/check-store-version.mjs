@@ -1,50 +1,20 @@
-// Reports, and optionally asserts, the version the Chrome Web Store has published.
+// Reports, and optionally asserts, the version the Chrome Web Store holds.
 //
 // The upload action's publish call has returned HTTP 400 on releases that did in
-// fact publish (1.2.1 and 1.2.2 both went public while the job reported failure),
+// fact reach the store (1.2.1 and 1.2.2 both did while the job reported failure),
 // so a release must not decide success from that exit code alone. Ask the store.
 //
 // Runs only in trusted GitHub Actions jobs. Never log credentials or token bodies.
-const names = ["CHROME_CLIENT_ID", "CHROME_CLIENT_SECRET", "CHROME_REFRESH_TOKEN", "CHROME_EXTENSION_ID"];
-for (const name of names) {
-  if (!process.env[name]) throw new Error(`Missing ${name}. Configure the repository release secret.`);
-}
+import { requireCredentials, accessToken, itemDraft, shaped } from "./store-api.mjs";
 
-const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-  method: "POST",
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  body: new URLSearchParams({
-    client_id: process.env.CHROME_CLIENT_ID,
-    client_secret: process.env.CHROME_CLIENT_SECRET,
-    refresh_token: process.env.CHROME_REFRESH_TOKEN,
-    grant_type: "refresh_token",
-  }),
-  signal: AbortSignal.timeout(20_000),
-});
-if (!tokenResponse.ok) {
-  throw new Error(`Chrome Web Store authorization failed (HTTP ${tokenResponse.status}). Renew the release credentials before publishing.`);
-}
-const { access_token: accessToken } = await tokenResponse.json();
-if (!accessToken) throw new Error("Chrome Web Store did not return an access token.");
+requireCredentials();
+const draft = await itemDraft(await accessToken());
 
-// v1.1 items.get only supports the DRAFT projection; PUBLISHED returns HTTP 400.
-// That means this API can confirm the release reached the store, but not that the
-// public listing has finished rolling out.
-const item = process.env.CHROME_EXTENSION_ID;
-const response = await fetch(`https://www.googleapis.com/chromewebstore/v1.1/items/${encodeURIComponent(item)}?projection=DRAFT`, {
-  headers: { Authorization: `Bearer ${accessToken}`, "x-goog-api-version": "2" },
-  signal: AbortSignal.timeout(20_000),
-});
-if (!response.ok) throw new Error(`Chrome Web Store item lookup failed (HTTP ${response.status}).`);
-const draft = await response.json();
-
-// Only echo values the store itself reported, matched against a version shape.
-const version = /^[0-9.]{1,32}$/.exec(String(draft.crxVersion ?? ""))?.[0] ?? "unknown";
-console.log(`Chrome Web Store: item version ${version}, upload state ${draft.uploadState ?? "unknown"}.`);
+const version = shaped(draft.crxVersion, /^[0-9.]{1,32}$/);
+const state = shaped(draft.uploadState, /^[A-Z_]{1,32}$/);
+console.log(`Chrome Web Store: item version ${version}, upload state ${state}.`);
 if (draft.itemError?.length) {
-  const codes = draft.itemError
-    .map((error) => /^[\w.-]{1,64}$/.exec(String(error.error_code ?? ""))?.[0] ?? "unknown")
-    .join(", ");
+  const codes = draft.itemError.map((error) => shaped(error.error_code, /^[\w.-]{1,64}$/)).join(", ");
   console.log(`Store reported item errors: ${codes}`);
 }
 
