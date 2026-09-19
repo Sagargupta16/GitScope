@@ -31,6 +31,8 @@ function stored(): StoredAuth | null {
 // credential is a bug or a poisoning attempt: refuse it instead of persisting it.
 const CREDENTIAL = /^[\w.~-]{1,255}$/;
 const SCOPE = /^[\w:.~-]{1,64}$/;
+// Scopes are compared as a sorted join, so the order only has to be stable.
+const byValue = (a: string, b: string) => a.localeCompare(b);
 // Returns the matched value itself, so what gets persisted is the validated
 // substring rather than the caller's string.
 function allowed(value: unknown, pattern: RegExp): string | null {
@@ -60,7 +62,7 @@ export function storeAuth(token: string, login: string, scopes: string[] = []) {
   }
   const previous = stored();
   const sameSession = previous?.token === safeToken && previous.login === safeLogin &&
-    [...previous.scopes].sort().join(",") === [...safeScopes].sort().join(",");
+    [...previous.scopes].sort(byValue).join(",") === [...safeScopes].sort(byValue).join(",");
   generation++;
   pendingVerification = null;
   if (!sameSession) clearCachedData();
