@@ -5,16 +5,20 @@
 // so a release must not decide success from that exit code alone. Ask the store.
 //
 // Runs only in trusted GitHub Actions jobs. Never log credentials or token bodies.
-import { requireCredentials, accessToken, itemDraft, shaped } from "./store-api.mjs";
+import { requireCredentials, accessToken, itemDraft } from "./store-api.mjs";
 
 requireCredentials();
 const draft = await itemDraft(await accessToken());
 
-const version = shaped(draft.crxVersion, /^[0-9.]{1,32}$/);
-const state = shaped(draft.uploadState, /^[A-Z_]{1,32}$/);
+// The store's response is remote input. Match each field against its expected
+// shape here at the log site, so only the matched text is ever printed.
+const version = /^[0-9.]{1,32}$/.exec(String(draft.crxVersion ?? ""))?.[0] ?? "unknown";
+const state = /^[A-Z_]{1,32}$/.exec(String(draft.uploadState ?? ""))?.[0] ?? "unknown";
 console.log(`Chrome Web Store: item version ${version}, upload state ${state}.`);
 if (draft.itemError?.length) {
-  const codes = draft.itemError.map((error) => shaped(error.error_code, /^[\w.-]{1,64}$/)).join(", ");
+  const codes = draft.itemError
+    .map((error) => /^[\w.-]{1,64}$/.exec(String(error.error_code ?? ""))?.[0] ?? "unknown")
+    .join(", ");
   console.log(`Store reported item errors: ${codes}`);
 }
 

@@ -40,9 +40,3 @@ export async function itemDraft(token) {
   if (!response.ok) throw new Error(`Chrome Web Store item access failed (HTTP ${response.status}). Check publisher access.`);
   return response.json();
 }
-
-// The store's responses are remote input. Echo only what matches an expected
-// shape, so nothing from the network reaches a log line unchecked.
-export function shaped(value, pattern) {
-  return pattern.exec(String(value ?? ""))?.[0] ?? "unknown";
-}
