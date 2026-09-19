@@ -33,10 +33,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: website/pnpm-lock.yaml
 
-      - run: pnpm install --frozen-lockfile
+      # Dependency lifecycle scripts are not needed to build or test this repo,
+      # so skip them rather than run arbitrary install-time code in CI.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
         working-directory: website
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - run: npm test
 
