@@ -42,7 +42,10 @@ const draft = await response.json();
 const version = /^[0-9.]{1,32}$/.exec(String(draft.crxVersion ?? ""))?.[0] ?? "unknown";
 console.log(`Chrome Web Store: item version ${version}, upload state ${draft.uploadState ?? "unknown"}.`);
 if (draft.itemError?.length) {
-  console.log(`Store reported item errors: ${draft.itemError.map((error) => error.error_code ?? "unknown").join(", ")}`);
+  const codes = draft.itemError
+    .map((error) => /^[\w.-]{1,64}$/.exec(String(error.error_code ?? ""))?.[0] ?? "unknown")
+    .join(", ");
+  console.log(`Store reported item errors: ${codes}`);
 }
 
 const expected = process.argv[2];
