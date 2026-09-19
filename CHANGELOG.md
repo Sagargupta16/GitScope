@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3](https://github.com/Sagargupta16/GitScope/compare/v1.2.2...v1.2.3) (2026-09-19)
+
+
+### Bug Fixes
+
+* decide the store outcome by querying the store ([#54](https://github.com/Sagargupta16/GitScope/issues/54)) ([ff17874](https://github.com/Sagargupta16/GitScope/commit/ff17874495287e84fbb867c55ceed65d54e04eea))
+
 ## [1.2.2](https://github.com/Sagargupta16/GitScope/compare/v1.2.1...v1.2.2) (2026-09-19)
 
 
