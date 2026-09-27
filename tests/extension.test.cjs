@@ -267,7 +267,7 @@ function dom() {
     getAttribute(key) { return this.attributes[key] ?? null; }
     // Mirrors DOMStringMap: dataset.fooBar reads and writes the data-foo-bar attribute.
     get dataset() {
-      const name = key => `data-${key.replaceAll(/[A-Z]/g, c => `-${c.toLowerCase()}`)}`;
+      const name = key => "data-" + key.replaceAll(/[A-Z]/g, c => `-${c.toLowerCase()}`);
       return new Proxy({}, {
         get: (_target, key) => this.attributes[name(key)],
         set: (_target, key, value) => { this.attributes[name(key)] = String(value); return true; },
