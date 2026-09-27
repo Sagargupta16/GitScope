@@ -21,7 +21,15 @@ jobs:
           CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
         run: node scripts/check-store-auth.mjs
 
-      - name: Report the version the store has published
+      # Runs even when the credential step above failed, because it needs no
+      # credentials and answers the question that matters: what do users have.
+      - name: Report the version Chrome serves users
+        if: always()
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: node scripts/check-store-served.mjs
+
+      - name: Report the version the store item holds
         env:
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
