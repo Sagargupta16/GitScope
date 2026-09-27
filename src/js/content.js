@@ -27,6 +27,25 @@ function viewerStatsFor(user) {
   };
 }
 
+const STALE = Symbol("stale");
+
+// The signed-in viewer's stats to compare this profile against: null on their own
+// profile (which it saves instead), or STALE if the route changed mid-way.
+async function comparisonStats(data, viewer, token, isCurrent) {
+  if (viewer.login.toLowerCase() === data.user.login.toLowerCase()) {
+    await saveViewerStats(viewerStatsFor(data.user), token);
+    return null;
+  }
+  const cached = await getViewerStats(token);
+  if (!isCurrent()) return STALE;
+  if (cached && cached.login.toLowerCase() === viewer.login.toLowerCase()) return cached;
+  const ownData = await fetchProfileInsights(viewer.login, token);
+  if (!isCurrent()) return STALE;
+  const stats = viewerStatsFor(ownData.user);
+  await saveViewerStats(stats, token);
+  return stats;
+}
+
 async function init(force = false) {
   if (navigating) return;
   const route = window.location.href;
@@ -55,21 +74,8 @@ async function init(force = false) {
       fetchProfileInsights(username, token), fetchAuthenticatedViewer(token),
     ]);
     if (!isCurrent()) return;
-    const isOwnProfile = viewer.login.toLowerCase() === data.user.login.toLowerCase();
-    let viewerStats = null;
-    if (isOwnProfile) {
-      await saveViewerStats(viewerStatsFor(data.user), token);
-    } else {
-      viewerStats = await getViewerStats(token);
-      if (!isCurrent()) return;
-      if (!viewerStats || viewerStats.login.toLowerCase() !== viewer.login.toLowerCase()) {
-        const ownData = await fetchProfileInsights(viewer.login, token);
-        if (!isCurrent()) return;
-        viewerStats = viewerStatsFor(ownData.user);
-        await saveViewerStats(viewerStats, token);
-      }
-    }
-    if (!isCurrent()) return;
+    const viewerStats = await comparisonStats(data, viewer, token, isCurrent);
+    if (viewerStats === STALE || !isCurrent()) return;
     const panel = buildInsightsPanel(data, viewerStats);
     injectDashboard(panel);
   } catch (err) {

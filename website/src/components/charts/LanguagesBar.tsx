@@ -5,7 +5,7 @@ interface LanguagesBarProps {
   totalCount: number;
 }
 
-export function LanguagesBar({ languages, totalCount }: LanguagesBarProps) {
+export function LanguagesBar({ languages, totalCount }: Readonly<LanguagesBarProps>) {
   if (languages.length === 0) return null;
 
   return (

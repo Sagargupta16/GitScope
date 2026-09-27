@@ -5,7 +5,7 @@ interface StatCardProps {
   trend?: "up" | "down" | "neutral";
 }
 
-export function StatCard({ label, value, subValue, trend }: StatCardProps) {
+export function StatCard({ label, value, subValue, trend }: Readonly<StatCardProps>) {
   return (
     <div className="p-4 rounded-lg border border-[var(--color-github-border)] bg-[var(--color-github-dark)]">
       <div className="text-xs text-[var(--color-github-muted)] uppercase tracking-wide mb-1">

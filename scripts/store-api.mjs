@@ -40,3 +40,17 @@ export async function itemDraft(token) {
   if (!response.ok) throw new Error(`Chrome Web Store item access failed (HTTP ${response.status}). Check publisher access.`);
   return response.json();
 }
+
+// The version Chrome actually hands to users, which is the only proof a release
+// shipped. items.get reports the draft, so it stays at the uploaded version even
+// when publishing never completed. Public endpoint, no credentials.
+export async function servedVersion() {
+  const id = process.env.CHROME_EXTENSION_ID;
+  const query = encodeURIComponent(`id=${id}&uc`);
+  const url = `https://clients2.google.com/service/update2/crx?response=updatecheck&prodversion=130.0&acceptformat=crx3&x=${query}`;
+  const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+  if (!response.ok) throw new Error(`Chrome update service failed (HTTP ${response.status}).`);
+  // Read the updatecheck element; the document also opens with an XML version.
+  const element = /<updatecheck\b[^>]*>/.exec(await response.text())?.[0] ?? "";
+  return /\bversion="(\d+(?:\.\d+){0,3})"/.exec(element)?.[1] ?? "unknown";
+}

@@ -24,7 +24,7 @@ export function TopReposBarChart({
   title,
   color = "#238636",
   limit = 10,
-}: TopReposBarChartProps) {
+}: Readonly<TopReposBarChartProps>) {
   const unavailableCount = repos.filter((repo) => repo[dataKey] === null).length;
   const sorted = repos.filter((repo) => repo[dataKey] !== null)
     .sort((a, b) => (b[dataKey] ?? 0) - (a[dataKey] ?? 0))

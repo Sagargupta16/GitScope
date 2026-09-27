@@ -19,7 +19,7 @@ interface CommitActivityChartProps {
 export function CommitActivityChart({
   data,
   title = "Commit Activity (last 52 weeks)",
-}: CommitActivityChartProps) {
+}: Readonly<CommitActivityChartProps>) {
   // Filter to non-empty weeks and format
   const formatted = data
     .filter((w) => w.week > 0)

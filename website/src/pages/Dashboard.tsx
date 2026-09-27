@@ -23,7 +23,7 @@ const SORT_OPTIONS: { key: RepoSortKey; label: string }[] = [
   { key: "forks_count", label: "Forks" },
 ];
 
-function RepoRow({ repo, sortBy }: { repo: DashboardRepo; sortBy: RepoSortKey }) {
+function RepoRow({ repo, sortBy }: Readonly<{ repo: DashboardRepo; sortBy: RepoSortKey }>) {
   return (
     <Link
       to={`/dashboard/repo/${repo.name}`}
@@ -320,7 +320,7 @@ export function Dashboard() {
           Views available for {data.trafficCoverage.views} of {data.trafficCoverage.total} repositories;
           clones for {data.trafficCoverage.clones} of {data.trafficCoverage.total}. Totals cover available data only.
           Unique counts are summed across repositories; people visiting multiple repositories can be counted more than once.
-          {data.warnings.length > 0 && <ul className="mt-2 list-disc pl-5">{data.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul>}
+          {data.warnings.length > 0 && <ul className="mt-2 list-disc pl-5">{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
         </div>
         {/* Traffic stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

@@ -10,7 +10,7 @@ type SortKey = "totalStars" | "public_repos" | "followers" | "totalForks" | "lan
 
 const CACHE_TTL = 10 * 60 * 1000;
 
-function RankBadge({ rank }: { rank: number }) {
+function RankBadge({ rank }: Readonly<{ rank: number }>) {
   if (rank === 1) return <span role="img" aria-label="Rank 1" className="text-lg" title="1st">&#129351;</span>;
   if (rank === 2) return <span role="img" aria-label="Rank 2" className="text-lg" title="2nd">&#129352;</span>;
   if (rank === 3) return <span role="img" aria-label="Rank 3" className="text-lg" title="3rd">&#129353;</span>;
@@ -21,7 +21,8 @@ function cacheAge(login: string, session: string): string | null {
   try {
     const cached = JSON.parse(localStorage.getItem(accountCacheKey("leaderboard", login, session)) ?? "null");
     const minutes = Math.round((Date.now() - cached.timestamp) / 60000);
-    return Number.isFinite(minutes) ? minutes < 1 ? "just now" : `${minutes}m ago` : null;
+    if (!Number.isFinite(minutes)) return null;
+    return minutes < 1 ? "just now" : `${minutes}m ago`;
   } catch { return null; }
 }
 
