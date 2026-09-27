@@ -57,6 +57,93 @@ function cookie(value, age = MAX_AGE) {
   return `${COOKIE}=${value}; Path=/; Max-Age=${age}; Secure; HttpOnly; SameSite=Lax`;
 }
 
+async function handleLogin(url, env) {
+  const web = url.pathname === "/web/login";
+  const returnTo = url.searchParams.get("return_to") || "leaderboard";
+  const clientState = url.searchParams.get("client_state") || "";
+  if (!ROUTES.has(returnTo) || (clientState && !/^[a-f0-9]{64}$/.test(clientState))) {
+    return response("Invalid login request.", 400);
+  }
+  const state = randomState();
+  // Old website releases have no client_state and need their existing traffic scope.
+  // New clients explicitly opt into traffic; both paths receive validated OAuth state.
+  const traffic = web && (url.searchParams.get("traffic") === "1" || !clientState);
+  const payload = { state, web, returnTo, clientState, expires: Date.now() + MAX_AGE * 1000 };
+  const githubUrl = new URL("https://github.com/login/oauth/authorize");
+  githubUrl.search = new URLSearchParams({
+    client_id: env.CLIENT_ID,
+    redirect_uri: env.REDIRECT_URI,
+    scope: traffic ? "read:user read:org repo" : "read:user read:org",
+    state,
+  }).toString();
+  return response(null, 302, {
+    Location: githubUrl.toString(),
+    "Set-Cookie": cookie(await seal(payload, env.CLIENT_SECRET)),
+  });
+}
+
+// GitHub's token response, or null when it refused the code or returned no token.
+async function exchangeCode(code, env) {
+  const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      client_id: env.CLIENT_ID,
+      client_secret: env.CLIENT_SECRET,
+      redirect_uri: env.REDIRECT_URI,
+      code,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!tokenResponse.ok) return null;
+  const tokenData = await tokenResponse.json();
+  if (tokenData.error || typeof tokenData.access_token !== "string" || !tokenData.access_token) return null;
+  return tokenData;
+}
+
+async function handleCallback(request, url, env) {
+  const state = url.searchParams.get("state");
+  const rawCookie = (request.headers.get("Cookie") || "").split(";")
+    .map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
+  const pending = rawCookie ? await unseal(rawCookie, env.CLIENT_SECRET) : null;
+  const clearedCookie = { "Set-Cookie": cookie("", 0) };
+  if (!state || pending?.state !== state) {
+    return response("This sign-in has expired or does not match this browser. Start sign-in again.", 400, clearedCookie);
+  }
+
+  const siteBase = (env.SITE_URL || "https://sagargupta16.github.io/GitScope").replace(/\/$/, "");
+  function finishError() {
+    if (pending.web) {
+      const fragment = new URLSearchParams({ error: "auth_failed", state: pending.clientState });
+      return response(null, 302, { ...clearedCookie, Location: `${siteBase}/${pending.returnTo}#${fragment}` });
+    }
+    return response("Authorization failed. Close this tab and start sign-in again.", 400, clearedCookie);
+  }
+
+  const code = url.searchParams.get("code");
+  if (!code || url.searchParams.has("error")) return finishError();
+  try {
+    const tokenData = await exchangeCode(code, env);
+    if (!tokenData) return finishError();
+    if (pending.web) {
+      const fragment = new URLSearchParams({
+        token: tokenData.access_token,
+        state: pending.clientState,
+        scope: tokenData.scope || "",
+      });
+      return response(null, 302, { ...clearedCookie, Location: `${siteBase}/${pending.returnTo}#${fragment}` });
+    }
+    const nonce = randomState();
+    return response(renderPage(tokenData.access_token, nonce), 200, {
+      ...clearedCookie,
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'`,
+    });
+  } catch {
+    return finishError();
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -68,84 +155,8 @@ export default {
     }
     if (!["/login", "/web/login", "/callback"].includes(url.pathname)) return response("Not found", 404);
     if (!env.CLIENT_ID || !env.CLIENT_SECRET || !env.REDIRECT_URI) return response("Authentication is unavailable.", 503);
-
-    if (url.pathname === "/login" || url.pathname === "/web/login") {
-      const web = url.pathname === "/web/login";
-      const returnTo = url.searchParams.get("return_to") || "leaderboard";
-      const clientState = url.searchParams.get("client_state") || "";
-      if (!ROUTES.has(returnTo) || (clientState && !/^[a-f0-9]{64}$/.test(clientState))) {
-        return response("Invalid login request.", 400);
-      }
-      const state = randomState();
-      // Old website releases have no client_state and need their existing traffic scope.
-      // New clients explicitly opt into traffic; both paths receive validated OAuth state.
-      const traffic = web && (url.searchParams.get("traffic") === "1" || !clientState);
-      const payload = { state, web, returnTo, clientState, expires: Date.now() + MAX_AGE * 1000 };
-      const githubUrl = new URL("https://github.com/login/oauth/authorize");
-      githubUrl.search = new URLSearchParams({
-        client_id: env.CLIENT_ID,
-        redirect_uri: env.REDIRECT_URI,
-        scope: traffic ? "read:user read:org repo" : "read:user read:org",
-        state,
-      }).toString();
-      return response(null, 302, {
-        Location: githubUrl.toString(),
-        "Set-Cookie": cookie(await seal(payload, env.CLIENT_SECRET)),
-      });
-    }
-
-    const state = url.searchParams.get("state");
-    const rawCookie = (request.headers.get("Cookie") || "").split(";")
-      .map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
-    const pending = rawCookie ? await unseal(rawCookie, env.CLIENT_SECRET) : null;
-    const clearedCookie = { "Set-Cookie": cookie("", 0) };
-    if (!state || pending?.state !== state) {
-      return response("This sign-in has expired or does not match this browser. Start sign-in again.", 400, clearedCookie);
-    }
-
-    const siteBase = (env.SITE_URL || "https://sagargupta16.github.io/GitScope").replace(/\/$/, "");
-    function finishError() {
-      if (pending.web) {
-        const fragment = new URLSearchParams({ error: "auth_failed", state: pending.clientState });
-        return response(null, 302, { ...clearedCookie, Location: `${siteBase}/${pending.returnTo}#${fragment}` });
-      }
-      return response("Authorization failed. Close this tab and start sign-in again.", 400, clearedCookie);
-    }
-
-    const code = url.searchParams.get("code");
-    if (!code || url.searchParams.has("error")) return finishError();
-    try {
-      const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          client_id: env.CLIENT_ID,
-          client_secret: env.CLIENT_SECRET,
-          redirect_uri: env.REDIRECT_URI,
-          code,
-        }),
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!tokenResponse.ok) return finishError();
-      const tokenData = await tokenResponse.json();
-      if (tokenData.error || typeof tokenData.access_token !== "string" || !tokenData.access_token) return finishError();
-      if (pending.web) {
-        const fragment = new URLSearchParams({
-          token: tokenData.access_token,
-          state: pending.clientState,
-          scope: tokenData.scope || "",
-        });
-        return response(null, 302, { ...clearedCookie, Location: `${siteBase}/${pending.returnTo}#${fragment}` });
-      }
-      const nonce = randomState();
-      return response(renderPage(tokenData.access_token, nonce), 200, {
-        ...clearedCookie,
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'`,
-      });
-    } catch {
-      return finishError();
-    }
+    if (url.pathname === "/callback") return handleCallback(request, url, env);
+    return handleLogin(url, env);
   },
 };
 
