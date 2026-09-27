@@ -4,6 +4,7 @@
 // (Sep 19 to Sep 27 was 8 days, the 7-day expiry of an OAuth client left in
 // Testing), and when that happens every authenticated check goes dark. Whether a
 // release reached users is the one thing that must stay observable regardless.
+import { appendFileSync } from "node:fs";
 import { servedVersion } from "./store-api.mjs";
 
 if (!process.env.CHROME_EXTENSION_ID) {
@@ -12,6 +13,8 @@ if (!process.env.CHROME_EXTENSION_ID) {
 
 const served = await servedVersion();
 console.log(`Chrome serves users: ${served}.`);
+// servedVersion already matched this against a version pattern.
+if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `served=${served}\n`);
 
 const expected = process.argv[2];
 if (expected && served !== expected) {

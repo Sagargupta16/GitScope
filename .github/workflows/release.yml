@@ -5,9 +5,9 @@ on:
     branches:
       - main
 
+# Each job declares the writes it needs, so nothing inherits write access by default.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -18,11 +18,14 @@ jobs:
   # and flips release_created, which gates the build + publish jobs below.
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           config-file: release-please-config.json
@@ -32,6 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,7 +77,7 @@ jobs:
           if-no-files-found: error
 
       - name: Attach build to GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: gitscope-${{ needs.release-please.outputs.tag_name }}.zip
@@ -98,7 +103,7 @@ jobs:
       - name: Upload to Chrome Web Store
         id: chrome-upload
         continue-on-error: true
-        uses: mnao305/chrome-extension-upload@v6.0.0
+        uses: mnao305/chrome-extension-upload@fdfe79400af990f5145a319e834aee64907ccff4 # v6.0.0
         with:
           file-path: gitscope-${{ needs.release-please.outputs.tag_name }}.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
@@ -119,23 +124,41 @@ jobs:
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: node scripts/check-store-version.mjs "${TAG#v}"
 
+      # The store item holding the version only proves the upload. 1.2.0 to 1.2.3
+      # all got this far and none reached users, so report what Chrome serves too.
+      # Needs no credentials, so it still answers when the token has expired.
+      - name: Check what Chrome serves users
+        id: chrome-served
+        if: always()
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: node scripts/check-store-served.mjs
+
       - name: Report store outcome
         if: always()
         env:
           UPLOAD: ${{ steps.chrome-upload.outcome }}
           VERIFY: ${{ steps.chrome-verify.outcome }}
+          SERVED: ${{ steps.chrome-served.outputs.served }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           set -euo pipefail
 
           if [ "${VERIFY}" = "success" ]; then
-            echo "The Chrome Web Store holds ${TAG}."
             {
-              echo "### Chrome Web Store has \`${TAG}\`"
+              echo "### \`${TAG}\` uploaded to the Chrome Web Store"
               echo
-              echo "Upload step reported \`${UPLOAD}\`; the store was then queried directly and holds this version."
-              echo "The public listing updates once store review and rollout complete, which can take hours."
+              echo "Upload step reported \`${UPLOAD}\`; the store was then queried directly and its item holds this version."
+              echo "Chrome currently serves users \`${SERVED:-unknown}\`."
             } >> "$GITHUB_STEP_SUMMARY"
+            if [ "${SERVED:-}" = "${TAG#v}" ]; then
+              echo "Users are served ${TAG}."
+            else
+              # Review and rollout take hours, so this cannot fail the run, but it
+              # must not read as published either.
+              echo "::warning::${TAG} is uploaded but users are served ${SERVED:-unknown}. If this persists, publish the draft from the Developer Dashboard."
+              echo "Not yet published to users. If this persists, publish the draft from the [Developer Dashboard](https://chrome.google.com/webstore/devconsole)." >> "$GITHUB_STEP_SUMMARY"
+            fi
             exit 0
           fi
 
