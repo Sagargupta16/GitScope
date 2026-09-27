@@ -122,7 +122,8 @@ async function fetchRepoTraffic(
     typeof referrer?.referrer === "string" && validCount(referrer.count) && validCount(referrer.uniques))) {
     result.referrers = referrers.value;
   } else {
-    result.warnings.push(`${repo}: referrers unavailable.${referrers.status === "rejected" ? ` ${errorMessage(referrers.reason)}` : ""}`);
+    const reason = referrers.status === "rejected" ? ` ${errorMessage(referrers.reason)}` : "";
+    result.warnings.push(`${repo}: referrers unavailable.${reason}`);
   }
   return result;
 }

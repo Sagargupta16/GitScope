@@ -42,13 +42,19 @@ export function LoginReturn() {
   return null;
 }
 
-export function LoginLink({ traffic = false, returnTo, className, children }: {
+function loginPage(returnTo: string) {
+  if (returnTo.startsWith("/dashboard")) return "dashboard";
+  if (returnTo.startsWith("/leaderboard")) return "leaderboard";
+  return "compare";
+}
+
+export function LoginLink({ traffic = false, returnTo, className, children }: Readonly<{
   traffic?: boolean;
   returnTo: string;
   className?: string;
   children: ReactNode;
-}) {
-  const page = returnTo.startsWith("/dashboard") ? "dashboard" : returnTo.startsWith("/leaderboard") ? "leaderboard" : "compare";
+}>) {
+  const page = loginPage(returnTo);
   const options = { traffic, returnTo: page } as const;
   return (
     <button type="button" className={className}

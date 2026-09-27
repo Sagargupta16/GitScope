@@ -15,6 +15,11 @@ const LANG_COLORS: Record<string, string> = {
   Lua: "#000080", Zig: "#ec915c", Elixir: "#6e4a7e", Haskell: "#5e5086",
 };
 
+function formatFollowerRatio(followers: number, following: number): string {
+  if (following > 0) return (followers / following).toFixed(1);
+  return followers > 0 ? "\u221e" : "0";
+}
+
 // REST API - no auth required, works for public profiles
 export async function fetchPublicProfile(username: string, signal?: AbortSignal): Promise<ProfileStats> {
   const client = createGitHubClient(undefined, signal);
@@ -51,9 +56,7 @@ export async function fetchPublicProfile(username: string, signal?: AbortSignal)
   const totalForksReceived = repos.reduce((sum, r) => sum + r.forks_count, 0);
   const languageCount = Object.keys(langMap).length;
   const accountAge = new Date().getFullYear() - new Date(user.created_at).getFullYear();
-  const followerRatio = user.following > 0
-    ? (user.followers / user.following).toFixed(1)
-    : user.followers > 0 ? "\u221e" : "0";
+  const followerRatio = formatFollowerRatio(user.followers, user.following);
 
   return {
     user, repos, totalStars, topLanguages, originalRepos, forkedRepos,
@@ -255,9 +258,7 @@ export async function fullProfile(
   const accountAge = new Date().getFullYear() - new Date(u.createdAt).getFullYear();
   const followers = u.followers.totalCount;
   const following = u.following?.totalCount ?? 0;
-  const followerRatio = following > 0
-    ? (followers / following).toFixed(1)
-    : followers > 0 ? "\u221e" : "0";
+  const followerRatio = formatFollowerRatio(followers, following);
 
   const streaks = computeStreaks(calendar, now);
   const personality = computePersonality(

@@ -16,6 +16,27 @@ export class GitHubApiError extends Error {
   }
 }
 
+const STATUS_ERRORS: Partial<Record<number, [GitHubErrorKind, string]>> = {
+  401: ["unauthorized", "GitHub authentication failed. Please sign in again."],
+  403: ["forbidden", "GitHub denied access to this resource."],
+  404: ["not-found", "GitHub resource not found."],
+};
+
+// URL of the rel="next" entry in a Link header. Equivalent to matching
+// /<([^>]+)>;\s*rel="next"/, but each "<" is checked once against its own ">"
+// instead of the regex rescanning from every "<", which is quadratic.
+const REL_NEXT = /;\s*rel="next"/y;
+function nextLink(link: string | null): string | undefined {
+  if (!link) return undefined;
+  for (let open = link.indexOf("<"); open !== -1; open = link.indexOf("<", open + 1)) {
+    const close = link.indexOf(">", open + 1);
+    if (close === -1) return undefined;
+    REL_NEXT.lastIndex = close + 1;
+    if (close > open + 1 && REL_NEXT.test(link)) return link.slice(open + 1, close);
+  }
+  return undefined;
+}
+
 export function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw signal.reason ?? new DOMException("Request cancelled", "AbortError");
 }
@@ -33,13 +54,9 @@ function classify(status: number, headers: Headers, message: string): GitHubApiE
     "GitHub API rate limit exceeded. Please wait before refreshing.",
     "rate-limit", status, headers.get("retry-after") ?? headers.get("x-ratelimit-reset") ?? undefined,
   );
-  const kind = status === 401 ? "unauthorized" : status === 403 ? "forbidden"
-    : status === 404 ? "not-found" : "http";
-  const prefix = status === 401 ? "GitHub authentication failed. Please sign in again."
-    : status === 403 ? "GitHub denied access to this resource."
-    : status === 404 ? "GitHub resource not found."
-    : `GitHub API error: ${status}.`;
-  return new GitHubApiError(`${prefix}${message ? ` ${message}` : ""}`, kind, status);
+  const [kind, prefix] = STATUS_ERRORS[status] ?? ["http", `GitHub API error: ${status}.`];
+  const detail = message ? ` ${message}` : "";
+  return new GitHubApiError(`${prefix}${detail}`, kind, status);
 }
 
 function apiUrl(path: string): URL {
@@ -148,7 +165,7 @@ export function createGitHubClient(token?: string, signal?: AbortSignal) {
         added++;
       }
       const link = headers.get("link");
-      const next = link?.match(/<([^>]+)>;\s*rel="next"/)?.[1];
+      const next = nextLink(link);
       if (next) {
         const nextUrl = apiUrl(next);
         if (nextUrl.pathname !== url.pathname) throw new GitHubApiError("Invalid GitHub pagination path.", "invalid-response");

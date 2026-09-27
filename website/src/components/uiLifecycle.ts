@@ -35,7 +35,7 @@ export function readAccountCache<T>(key: string, login: string, session: string,
   try {
     const cached = JSON.parse(localStorage.getItem(key) ?? "null");
     const age = Date.now() - cached?.timestamp;
-    if (!cached || cached.login !== login.toLowerCase() || cached.session !== session ||
+    if (cached?.login !== login.toLowerCase() || cached.session !== session ||
       getAuthSessionId() !== session || getStoredLogin()?.toLowerCase() !== login.toLowerCase() ||
       !Number.isFinite(age) || age < 0 || age > ttl) return null;
     return cached.data as T;

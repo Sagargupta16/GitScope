@@ -5,13 +5,18 @@ import { LoginLink } from "../components/LoginLink";
 import { useRequestGuard } from "../components/uiLifecycle";
 import { fetchRepoDetail } from "../lib/dashboard";
 import { formatNumber } from "../lib/analytics";
-import type { RepoDetailData } from "../lib/types";
+import type { RepoDetailData, TrafficData } from "../lib/types";
 import { StatCard } from "../components/charts/StatCard";
 import { TrafficAreaChart } from "../components/charts/TrafficAreaChart";
 import { ReferrersChart } from "../components/charts/ReferrersChart";
 import { CommitActivityChart } from "../components/charts/CommitActivityChart";
 import { ParticipationChart } from "../components/charts/ParticipationChart";
 import { format } from "date-fns";
+
+function avgViewsPerDay(views: TrafficData): string {
+  if (views.status === "unavailable") return "Unavailable";
+  return views.views.length > 0 ? (views.count / views.views.length).toFixed(1) : "0";
+}
 
 function formatSize(kb: number): string {
   if (kb >= 1024 * 1024) return `${(kb / (1024 * 1024)).toFixed(1)} GB`;
@@ -137,7 +142,7 @@ export function RepoDetail() {
         </div>
         {(data.warnings.length > 0 || data.statisticsPending) && <div role="status" aria-live="polite" className="text-sm text-[var(--color-github-muted)] mb-6">
           {data.statisticsPending && <p>GitHub is still preparing repository statistics. Refresh to check again.</p>}
-          {data.warnings.length > 0 && <ul className="list-disc pl-5">{data.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul>}
+          {data.warnings.length > 0 && <ul className="list-disc pl-5">{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
         </div>}
         {/* Topics */}
         {info.topics.length > 0 && (
@@ -214,11 +219,7 @@ export function RepoDetail() {
           />
           <StatCard
             label="Avg Views/Day"
-            value={
-              traffic.views.status === "unavailable" ? "Unavailable" : traffic.views.views.length > 0
-                ? (traffic.views.count / traffic.views.views.length).toFixed(1)
-                : "0"
-            }
+            value={avgViewsPerDay(traffic.views)}
           />
           <StatCard
             label="Referrers"

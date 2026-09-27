@@ -17,6 +17,24 @@ function el(tag, className, innerHTML) {
   return e;
 }
 
+// [arrow, class] per velocity trend; any unrecognised trend renders as neutral.
+const VELOCITY_DISPLAY = {
+  up: ["&#9650;", "gpi-trend-up"],
+  down: ["&#9660;", "gpi-trend-down"],
+  neutral: ["&#8212;", "gpi-trend-neutral"],
+};
+
+function formatFollowerRatio(followers, following) {
+  if (following > 0) return (followers / following).toFixed(1);
+  return followers > 0 ? "\u221e" : "0";
+}
+
+function diffClass(diff) {
+  if (diff > 0) return "gpi-diff-pos";
+  if (diff < 0) return "gpi-diff-neg";
+  return "";
+}
+
 export function buildInsightsPanel(data, viewerStats = null) {
   const user = data.user;
   const contribs = user.contributionsCollection;
@@ -82,14 +100,12 @@ export function buildInsightsPanel(data, viewerStats = null) {
   const weekendPct = computeWeekendPct(calendar);
   const languageCount = Object.keys(langMap).length;
   const accountAge = new Date().getFullYear() - new Date(user.createdAt).getFullYear();
-  const followerRatio = user.following?.totalCount > 0
-    ? (user.followers.totalCount / user.following.totalCount).toFixed(1)
-    : user.followers.totalCount > 0 ? "\u221e" : "0";
+  const followerRatio = formatFollowerRatio(user.followers.totalCount, user.following?.totalCount);
 
   // Build panel
   const panel = el("div", "gpi-panel");
   panel.id = "gpi-panel";
-  panel.setAttribute("data-profile", user.login.toLowerCase());
+  panel.dataset.profile = user.login.toLowerCase();
   panel.setAttribute("role", "region");
   panel.setAttribute("aria-label", `GitScope insights for ${user.login}`);
   const loaded = el("span", "gpi-sr-only");
@@ -131,8 +147,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
 
   // Personality badge + quick insights row
   const insightsRow = el("div", "gpi-section gpi-insights-row");
-  const velocityArrow = velocity.trend === "up" ? "&#9650;" : velocity.trend === "down" ? "&#9660;" : "&#8212;";
-  const velocityClass = velocity.trend === "up" ? "gpi-trend-up" : velocity.trend === "down" ? "gpi-trend-down" : "gpi-trend-neutral";
+  const [velocityArrow, velocityClass] = VELOCITY_DISPLAY[velocity.trend] ?? VELOCITY_DISPLAY.neutral;
   insightsRow.innerHTML =
     `<div class="gpi-personality">` +
     `<span class="gpi-personality-label">${personality.label}</span>` +
@@ -229,8 +244,10 @@ export function buildInsightsPanel(data, viewerStats = null) {
   const communityItems = [];
   if (reposContributedTo > 0) communityItems.push(`Contributed to <strong>${reposContributedTo}</strong> external repos`);
   if (orgCount > 0) communityItems.push(`Member of <strong>${orgCount}</strong> orgs`);
-  communityItems.push(`Follower ratio: <strong>${followerRatio}</strong> (${user.followers.totalCount}/${user.following?.totalCount ?? 0})`);
-  communityItems.push(`${accountAge} years on GitHub`);
+  communityItems.push(
+    `Follower ratio: <strong>${followerRatio}</strong> (${user.followers.totalCount}/${user.following?.totalCount ?? 0})`,
+    `${accountAge} years on GitHub`,
+  );
 
   const communitySection = el("div", "gpi-section gpi-community-section");
   communitySection.appendChild(el("div", "gpi-section-title", "Community & Impact"));
@@ -279,7 +296,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
       compareGrid.appendChild(el("div", "gpi-compare-row",
         `<span class="gpi-compare-label">${c.label}</span>` +
         `<span class="gpi-compare-theirs">${formatNumber(c.theirs)}</span>` +
-        `<span class="gpi-compare-diff ${diff > 0 ? "gpi-diff-pos" : diff < 0 ? "gpi-diff-neg" : ""}">${arrow}${formatNumber(diff)}</span>`
+        `<span class="gpi-compare-diff ${diffClass(diff)}">${arrow}${formatNumber(diff)}</span>`
       ));
     }
     compareSection.appendChild(compareGrid);
@@ -353,7 +370,7 @@ export function showLoadingSkeleton() {
   skeleton.innerHTML =
     `<div class="gpi-header"><span class="gpi-title">GitScope</span><span class="gpi-badge">Loading...</span></div>` +
     `<div class="gpi-stats-grid">` +
-    Array(6).fill('<div class="gpi-stat-card"><div class="gpi-skeleton-line gpi-skeleton-value"></div><div class="gpi-skeleton-line gpi-skeleton-label"></div></div>').join("") +
+    new Array(6).fill('<div class="gpi-stat-card"><div class="gpi-skeleton-line gpi-skeleton-value"></div><div class="gpi-skeleton-line gpi-skeleton-label"></div></div>').join("") +
     `</div>` +
     `<div class="gpi-section"><div class="gpi-skeleton-line" style="width:100%;height:8px;border-radius:4px"></div></div>`;
 

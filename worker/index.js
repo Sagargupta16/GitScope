@@ -15,11 +15,11 @@ async function signingKey(secret) {
 }
 
 function encode(bytes) {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(String.fromCodePoint(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 function decode(value) {
-  return Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), (char) => char.charCodeAt(0));
+  return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (char) => char.codePointAt(0));
 }
 
 async function seal(payload, secret) {
@@ -99,7 +99,7 @@ export default {
       .map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
     const pending = rawCookie ? await unseal(rawCookie, env.CLIENT_SECRET) : null;
     const clearedCookie = { "Set-Cookie": cookie("", 0) };
-    if (!state || !pending || pending.state !== state) {
+    if (!state || pending?.state !== state) {
       return response("This sign-in has expired or does not match this browser. Start sign-in again.", 400, clearedCookie);
     }
 
@@ -150,7 +150,7 @@ export default {
 };
 
 function renderPage(token, nonce) {
-  const safeToken = JSON.stringify(token).replace(/</g, "\\u003c");
+  const safeToken = JSON.stringify(token).replaceAll("<", String.raw`\u003c`);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GitScope - Authorization successful</title>
