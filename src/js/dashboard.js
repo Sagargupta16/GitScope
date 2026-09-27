@@ -35,6 +35,89 @@ function diffClass(diff) {
   return "";
 }
 
+function topReposSection(topRepos) {
+  if (topRepos.length === 0) return null;
+  const repoSection = el("div", "gpi-section");
+  repoSection.appendChild(el("div", "gpi-section-title", "Top Repositories"));
+  const repoList = el("div", "gpi-repo-list");
+  for (const repo of topRepos) {
+    const lang = repo.primaryLanguage;
+    repoList.appendChild(el("div", "gpi-repo-item",
+      `<a href="${repo.url}" class="gpi-repo-name">${repo.name}</a>` +
+      `<span class="gpi-repo-meta">` +
+      (lang ? `<span class="gpi-lang-dot" style="background:${lang.color}"></span>${lang.name}` : "") +
+      ` &middot; ${repo.stargazerCount} stars</span>`
+    ));
+  }
+  repoSection.appendChild(repoList);
+  return repoSection;
+}
+
+// Percentage label for a donut segment; anything above 0 but under 1 shows "<1".
+function segmentPercent(value, total) {
+  const rawPct = (value / total) * 100;
+  return rawPct > 0 && rawPct < 1 ? "<1" : rawPct.toFixed(0);
+}
+
+function contributionSection(contribs) {
+  const donutData = renderContributionDonut(
+    contribs.totalCommitContributions,
+    contribs.totalPullRequestContributions,
+    contribs.totalPullRequestReviewContributions,
+    contribs.totalIssueContributions
+  );
+  if (!donutData) return null;
+  const contribSection = el("div", "gpi-section gpi-contrib-section");
+  contribSection.appendChild(el("div", "gpi-section-title", "Contribution Breakdown"));
+  const contribContent = el("div", "gpi-contrib-content");
+  contribContent.appendChild(donutData.svg);
+
+  const contribStats = el("div", "gpi-contrib-stats");
+  for (const seg of donutData.segments) {
+    if (seg.value === 0) continue;
+    contribStats.appendChild(el("div", "gpi-contrib-row",
+      `<span class="gpi-pr-dot" style="background:${seg.color}"></span>` +
+      `${seg.label}: ${formatNumber(seg.value)} (${segmentPercent(seg.value, donutData.total)}%)`
+    ));
+  }
+  contribContent.appendChild(contribStats);
+  contribSection.appendChild(contribContent);
+  return contribSection;
+}
+
+function footerStatsSection(streaks, user, totalIssues) {
+  const footerStats = [];
+  if (streaks.busiestDay.contributionCount > 0) {
+    const bDate = new Date(streaks.busiestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    footerStats.push(`Busiest day: <strong>${bDate}</strong> (${streaks.busiestDay.contributionCount.toLocaleString()})`);
+  }
+  if (user.starredRepositories?.totalCount > 0) {
+    footerStats.push(`Starred repos: <strong>${formatNumber(user.starredRepositories.totalCount)}</strong>`);
+  }
+  if (totalIssues > 0) {
+    footerStats.push(`Issues opened: <strong>${formatNumber(totalIssues)}</strong>`);
+  }
+  if (footerStats.length === 0) return null;
+  return el("div", "gpi-section gpi-footer-stats", footerStats.join(" &middot; "));
+}
+
+function comparisonSection(viewerStats, comparisons) {
+  const compareSection = el("div", "gpi-section gpi-compare-section");
+  compareSection.appendChild(el("div", "gpi-section-title", `vs. You (${viewerStats.login})`));
+  const compareGrid = el("div", "gpi-compare-grid");
+  for (const c of comparisons) {
+    const diff = c.theirs - c.yours;
+    const arrow = diff > 0 ? "+" : "";
+    compareGrid.appendChild(el("div", "gpi-compare-row",
+      `<span class="gpi-compare-label">${c.label}</span>` +
+      `<span class="gpi-compare-theirs">${formatNumber(c.theirs)}</span>` +
+      `<span class="gpi-compare-diff ${diffClass(diff)}">${arrow}${formatNumber(diff)}</span>`
+    ));
+  }
+  compareSection.appendChild(compareGrid);
+  return compareSection;
+}
+
 export function buildInsightsPanel(data, viewerStats = null) {
   const user = data.user;
   const contribs = user.contributionsCollection;
@@ -172,22 +255,8 @@ export function buildInsightsPanel(data, viewerStats = null) {
   }
 
   // Top repositories
-  if (topRepos.length > 0) {
-    const repoSection = el("div", "gpi-section");
-    repoSection.appendChild(el("div", "gpi-section-title", "Top Repositories"));
-    const repoList = el("div", "gpi-repo-list");
-    for (const repo of topRepos) {
-      const lang = repo.primaryLanguage;
-      repoList.appendChild(el("div", "gpi-repo-item",
-        `<a href="${repo.url}" class="gpi-repo-name">${repo.name}</a>` +
-        `<span class="gpi-repo-meta">` +
-        (lang ? `<span class="gpi-lang-dot" style="background:${lang.color}"></span>${lang.name}` : "") +
-        ` &middot; ${repo.stargazerCount} stars</span>`
-      ));
-    }
-    repoSection.appendChild(repoList);
-    panel.appendChild(repoSection);
-  }
+  const repoSection = topReposSection(topRepos);
+  if (repoSection) panel.appendChild(repoSection);
 
   // Activity heatmap
   const heatmapSection = el("div", "gpi-section");
@@ -196,32 +265,8 @@ export function buildInsightsPanel(data, viewerStats = null) {
   panel.appendChild(heatmapSection);
 
   // Contribution breakdown donut
-  const donutData = renderContributionDonut(
-    contribs.totalCommitContributions,
-    contribs.totalPullRequestContributions,
-    contribs.totalPullRequestReviewContributions,
-    contribs.totalIssueContributions
-  );
-  if (donutData) {
-    const contribSection = el("div", "gpi-section gpi-contrib-section");
-    contribSection.appendChild(el("div", "gpi-section-title", "Contribution Breakdown"));
-    const contribContent = el("div", "gpi-contrib-content");
-    contribContent.appendChild(donutData.svg);
-
-    const contribStats = el("div", "gpi-contrib-stats");
-    for (const seg of donutData.segments) {
-      if (seg.value === 0) continue;
-      const rawPct = (seg.value / donutData.total) * 100;
-      const pct = rawPct > 0 && rawPct < 1 ? "<1" : rawPct.toFixed(0);
-      contribStats.appendChild(el("div", "gpi-contrib-row",
-        `<span class="gpi-pr-dot" style="background:${seg.color}"></span>` +
-        `${seg.label}: ${formatNumber(seg.value)} (${pct}%)`
-      ));
-    }
-    contribContent.appendChild(contribStats);
-    contribSection.appendChild(contribContent);
-    panel.appendChild(contribSection);
-  }
+  const contribSection = contributionSection(contribs);
+  if (contribSection) panel.appendChild(contribSection);
 
   // Day of week chart
   const weekdaySection = el("div", "gpi-section");
@@ -259,48 +304,19 @@ export function buildInsightsPanel(data, viewerStats = null) {
   panel.appendChild(communitySection);
 
   // Busiest day + extra stats
-  const footerStats = [];
-  if (streaks.busiestDay.contributionCount > 0) {
-    const bDate = new Date(streaks.busiestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-    footerStats.push(`Busiest day: <strong>${bDate}</strong> (${streaks.busiestDay.contributionCount.toLocaleString()})`);
-  }
-  if (user.starredRepositories?.totalCount > 0) {
-    footerStats.push(`Starred repos: <strong>${formatNumber(user.starredRepositories.totalCount)}</strong>`);
-  }
-  if (totalIssues > 0) {
-    footerStats.push(`Issues opened: <strong>${formatNumber(totalIssues)}</strong>`);
-  }
-
-  if (footerStats.length > 0) {
-    panel.appendChild(el("div", "gpi-section gpi-footer-stats", footerStats.join(" &middot; ")));
-  }
+  const footerSection = footerStatsSection(streaks, user, totalIssues);
+  if (footerSection) panel.appendChild(footerSection);
 
   // Profile comparison (when viewing someone else's profile)
   if (viewerStats) {
-    const compareSection = el("div", "gpi-section gpi-compare-section");
-    compareSection.appendChild(el("div", "gpi-section-title", `vs. You (${viewerStats.login})`));
-    const compareGrid = el("div", "gpi-compare-grid");
-
-    const comparisons = [
+    panel.appendChild(comparisonSection(viewerStats, [
       { label: "Last 365 Days", theirs: calendar.totalContributions, yours: viewerStats.totalContributions },
       { label: "Stars", theirs: totalStars, yours: viewerStats.totalStars },
       { label: "Repos", theirs: user.repositories.totalCount, yours: viewerStats.totalRepos },
       { label: "Merged PRs", theirs: mergedPRs, yours: viewerStats.mergedPRs },
       { label: "Forks Received", theirs: totalForksReceived, yours: viewerStats.totalForks ?? 0 },
       { label: "Followers", theirs: user.followers.totalCount, yours: viewerStats.followers ?? 0 },
-    ];
-
-    for (const c of comparisons) {
-      const diff = c.theirs - c.yours;
-      const arrow = diff > 0 ? "+" : "";
-      compareGrid.appendChild(el("div", "gpi-compare-row",
-        `<span class="gpi-compare-label">${c.label}</span>` +
-        `<span class="gpi-compare-theirs">${formatNumber(c.theirs)}</span>` +
-        `<span class="gpi-compare-diff ${diffClass(diff)}">${arrow}${formatNumber(diff)}</span>`
-      ));
-    }
-    compareSection.appendChild(compareGrid);
-    panel.appendChild(compareSection);
+    ]));
   }
 
   return panel;
