@@ -138,6 +138,54 @@ function incomplete(message: string): never {
   throw new GitHubApiError(`GitHub returned incomplete ${message}. Please refresh.`, "invalid-response");
 }
 
+type TotalKey = "totalCommitContributions" | "totalPullRequestContributions"
+  | "totalPullRequestReviewContributions" | "totalIssueContributions";
+
+function addTotals(totals: Record<TotalKey, number>, collection: Contributions) {
+  for (const key of Object.keys(totals) as TotalKey[]) {
+    if (!Number.isFinite(collection[key]) || collection[key] < 0) incomplete("contribution totals");
+    totals[key] += collection[key];
+  }
+}
+
+// The day when it falls inside [from, to], or null for calendar padding outside it.
+function dayInWindow(day: ContributionDay, from: string, to: string): ContributionDay | null {
+  if (day.date < from || day.date > to) return null;
+  if (!Number.isInteger(day.contributionCount) || day.contributionCount < 0) incomplete("contribution calendar");
+  return day;
+}
+
+// One window's days, rejecting a count that disagrees with the same date seen
+// earlier in this window or in a previous one.
+function windowCalendar(
+  weeks: Contributions["contributionCalendar"]["weeks"], from: string, to: string, seen: Map<string, ContributionDay>,
+): Map<string, ContributionDay> {
+  const windowDays = new Map<string, ContributionDay>();
+  for (const week of weeks) {
+    if (!Array.isArray(week.contributionDays)) incomplete("contribution calendar");
+    for (const raw of week.contributionDays) {
+      const day = dayInWindow(raw, from, to);
+      if (!day) continue;
+      const duplicate = windowDays.get(day.date) ?? seen.get(day.date);
+      if (duplicate && duplicate.contributionCount !== day.contributionCount) incomplete("contribution calendar");
+      windowDays.set(day.date, day);
+    }
+  }
+  return windowDays;
+}
+
+// Copies the window into days, requiring every date from fromMs to toMs.
+function fillWindow(
+  days: Map<string, ContributionDay>, windowDays: Map<string, ContributionDay>, fromMs: number, toMs: number, dayMs: number,
+) {
+  for (let date = fromMs; date <= toMs; date += dayMs) {
+    const key = new Date(date).toISOString().slice(0, 10);
+    const day = windowDays.get(key);
+    if (!day) incomplete("contribution calendar");
+    days.set(key, day);
+  }
+}
+
 async function fetchContributions(
   username: string, client: ReturnType<typeof createGitHubClient>, now: Date,
 ): Promise<Contributions> {
@@ -160,27 +208,9 @@ async function fetchContributions(
     );
     const collection = data.user?.contributionsCollection;
     if (!collection?.contributionCalendar?.weeks) incomplete("contribution data");
-    for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
-      if (!Number.isFinite(collection[key]) || collection[key] < 0) incomplete("contribution totals");
-      totals[key] += collection[key];
-    }
-    const windowDays = new Map<string, ContributionDay>();
-    for (const week of collection.contributionCalendar.weeks) {
-      if (!Array.isArray(week.contributionDays)) incomplete("contribution calendar");
-      for (const day of week.contributionDays) {
-        if (day.date < from.slice(0, 10) || day.date > to.slice(0, 10)) continue;
-        if (!Number.isInteger(day.contributionCount) || day.contributionCount < 0) incomplete("contribution calendar");
-        const duplicate = windowDays.get(day.date) ?? days.get(day.date);
-        if (duplicate && duplicate.contributionCount !== day.contributionCount) incomplete("contribution calendar");
-        windowDays.set(day.date, day);
-      }
-    }
-    for (let date = fromMs; date <= toMs; date += dayMs) {
-      const key = new Date(date).toISOString().slice(0, 10);
-      const day = windowDays.get(key);
-      if (!day) incomplete("contribution calendar");
-      days.set(key, day);
-    }
+    addTotals(totals, collection);
+    const windowDays = windowCalendar(collection.contributionCalendar.weeks, from.slice(0, 10), to.slice(0, 10), days);
+    fillWindow(days, windowDays, fromMs, toMs, dayMs);
   }
   const contributionDays = [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
   return {
@@ -192,21 +222,13 @@ async function fetchContributions(
   };
 }
 
-export async function fetchFullProfile(username: string, token: string, signal?: AbortSignal): Promise<FullProfileStats> {
-  return fullProfile(username, createGitHubClient(token, signal));
-}
-
-// Share rate-limit state with the dashboard's other requests.
-export async function fullProfile(
-  username: string, client: ReturnType<typeof createGitHubClient>,
-): Promise<FullProfileStats> {
-  const now = new Date();
-  const data = await client.graphql<{ user: GraphUser | null }>(PROFILE_QUERY, { username, after: null });
-  if (!data.user) throw new GitHubApiError(`User "${username}" not found`, "not-found", 404);
-  const u = data.user;
+// Every repository across all pages, keyed by id; fails on a stalled cursor.
+async function collectRepositories(
+  username: string, client: ReturnType<typeof createGitHubClient>, first: GraphUser["repositories"],
+): Promise<Map<string, GraphRepo>> {
   const repositoryMap = new Map<string, GraphRepo>();
   const cursors = new Set<string>();
-  let connection = u.repositories;
+  let connection = first;
   while (true) {
     if (!connection?.pageInfo || !Array.isArray(connection.nodes)) incomplete("repository data");
     for (const repo of connection.nodes) {
@@ -221,6 +243,43 @@ export async function fullProfile(
     if (!next.user) incomplete("repository data");
     connection = next.user.repositories;
   }
+  return repositoryMap;
+}
+
+// Top eight languages by owned, active repositories, plus how many languages there are.
+function languageBreakdown(nodes: GraphRepo[]): { topLanguages: Language[]; languageCount: number } {
+  const langMap: Record<string, { count: number; color: string }> = {};
+  let totalLangRepos = 0;
+  for (const repo of nodes) {
+    if (repo.isArchived || repo.isFork || !repo.primaryLanguage) continue;
+    const { name, color } = repo.primaryLanguage;
+    langMap[name] ??= { count: 0, color: color ?? LANG_COLORS[name] ?? "#8b949e" };
+    langMap[name].count++;
+    totalLangRepos++;
+  }
+  const topLanguages: Language[] = Object.entries(langMap)
+    .map(([name, { count, color }]) => ({
+      name, count, color,
+      percentage: totalLangRepos > 0 ? (count / totalLangRepos) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+  return { topLanguages, languageCount: Object.keys(langMap).length };
+}
+
+export async function fetchFullProfile(username: string, token: string, signal?: AbortSignal): Promise<FullProfileStats> {
+  return fullProfile(username, createGitHubClient(token, signal));
+}
+
+// Share rate-limit state with the dashboard's other requests.
+export async function fullProfile(
+  username: string, client: ReturnType<typeof createGitHubClient>,
+): Promise<FullProfileStats> {
+  const now = new Date();
+  const data = await client.graphql<{ user: GraphUser | null }>(PROFILE_QUERY, { username, after: null });
+  if (!data.user) throw new GitHubApiError(`User "${username}" not found`, "not-found", 404);
+  const u = data.user;
+  const repositoryMap = await collectRepositories(username, client, u.repositories);
   if (repositoryMap.size !== u.repositories.totalCount) incomplete("repository pagination");
   u.repositories.nodes = [...repositoryMap.values()];
   const contribs = await fetchContributions(username, client, now);
@@ -230,23 +289,7 @@ export async function fullProfile(
     (sum: number, r: { stargazerCount: number }) => sum + r.stargazerCount, 0,
   );
 
-  const langMap: Record<string, { count: number; color: string }> = {};
-  let totalLangRepos = 0;
-  for (const repo of u.repositories.nodes) {
-    if (repo.isArchived || repo.isFork || !repo.primaryLanguage) continue;
-    const { name, color } = repo.primaryLanguage;
-    langMap[name] ??= { count: 0, color: color ?? LANG_COLORS[name] ?? "#8b949e" };
-    langMap[name].count++;
-    totalLangRepos++;
-  }
-
-  const topLanguages: Language[] = Object.entries(langMap)
-    .map(([name, { count, color }]) => ({
-      name, count, color,
-      percentage: totalLangRepos > 0 ? (count / totalLangRepos) * 100 : 0,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
+  const { topLanguages, languageCount } = languageBreakdown(u.repositories.nodes);
 
   const repos = u.repositories.nodes;
   const originalRepos = repos.filter((r: { isFork: boolean; isArchived: boolean }) => !r.isFork && !r.isArchived).length;
@@ -254,7 +297,6 @@ export async function fullProfile(
   const totalForksReceived = repos.reduce(
     (sum: number, r: { forkCount: number }) => sum + r.forkCount, 0,
   );
-  const languageCount = Object.keys(langMap).length;
   const accountAge = new Date().getFullYear() - new Date(u.createdAt).getFullYear();
   const followers = u.followers.totalCount;
   const following = u.following?.totalCount ?? 0;

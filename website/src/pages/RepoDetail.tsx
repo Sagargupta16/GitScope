@@ -24,6 +24,31 @@ function formatSize(kb: number): string {
   return `${kb} KB`;
 }
 
+// The sign-in or permission prompt shown before traffic can be read. A plain
+// function rather than a component, so the rendered element tree is unchanged.
+function trafficAccessPrompt(
+  name: string | undefined, token: string | null, authError: string | null, onSignOut: () => void,
+) {
+  return (
+    <section className="py-20 px-6">
+      <div className="max-w-2xl mx-auto text-center">
+        <h1 className="text-3xl font-bold mb-4">{name}</h1>
+        <p className="text-[var(--color-github-muted)] mb-8">
+          {token ? "Enable traffic analytics to view this repository. GitHub’s repo permission includes broad access to private repositories; GitScope uses it to read analytics." : "Sign in to view traffic analytics for this repository."}
+        </p>
+        <LoginLink
+          traffic={Boolean(token)} returnTo={`/dashboard/repo/${encodeURIComponent(name ?? "")}`}
+          className="inline-block bg-[var(--color-brand)] hover:bg-[var(--color-brand-light)] text-white px-6 py-3 rounded-lg font-semibold no-underline transition-colors"
+        >
+          {token ? "Enable traffic analytics" : "Sign in with GitHub"}
+        </LoginLink>
+        {authError && <p role="alert" className="text-red-400 mt-4">{authError}</p>}
+        {token && <button onClick={onSignOut} className="block mx-auto mt-4 text-sm">Sign out</button>}
+      </div>
+    </section>
+  );
+}
+
 export function RepoDetail() {
   const { name } = useParams<{ name: string }>();
   const { token, login, scopes, loading: authLoading, error: authError, signOut } = useAuth();
@@ -50,26 +75,7 @@ export function RepoDetail() {
   function handleSignOut() { cancel(); setData(null); signOut(); }
   if (authLoading) return <p role="status" aria-live="polite" className="py-20 px-6 text-center">Checking sign-in…</p>;
 
-  if (!token || !trafficAccess) {
-    return (
-      <section className="py-20 px-6">
-        <div className="max-w-2xl mx-auto text-center">
-          <h1 className="text-3xl font-bold mb-4">{name}</h1>
-          <p className="text-[var(--color-github-muted)] mb-8">
-            {token ? "Enable traffic analytics to view this repository. GitHub’s repo permission includes broad access to private repositories; GitScope uses it to read analytics." : "Sign in to view traffic analytics for this repository."}
-          </p>
-          <LoginLink
-            traffic={Boolean(token)} returnTo={`/dashboard/repo/${encodeURIComponent(name ?? "")}`}
-            className="inline-block bg-[var(--color-brand)] hover:bg-[var(--color-brand-light)] text-white px-6 py-3 rounded-lg font-semibold no-underline transition-colors"
-          >
-            {token ? "Enable traffic analytics" : "Sign in with GitHub"}
-          </LoginLink>
-          {authError && <p role="alert" className="text-red-400 mt-4">{authError}</p>}
-          {token && <button onClick={handleSignOut} className="block mx-auto mt-4 text-sm">Sign out</button>}
-        </div>
-      </section>
-    );
-  }
+  if (!token || !trafficAccess) return trafficAccessPrompt(name, token, authError, handleSignOut);
 
   if (loading) {
     return (
