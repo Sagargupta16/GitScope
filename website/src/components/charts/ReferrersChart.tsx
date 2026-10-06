@@ -22,7 +22,7 @@ export function ReferrersChart({
   title = "Top Referrers",
   uniqueLabel = "Unique",
   unavailable = false,
-}: ReferrersChartProps) {
+}: Readonly<ReferrersChartProps>) {
   const top = referrers.slice(0, 10);
 
   if (top.length === 0 || unavailable) {

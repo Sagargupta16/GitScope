@@ -4,7 +4,7 @@ import { saveToken } from "./storage.js";
 
 let saving = false;
 const checkToken = setInterval(async () => {
-  const token = document.body?.getAttribute("data-gpi-token");
+  const token = document.body?.dataset.gpiToken;
   if (token) {
     if (saving) return;
     saving = true;
@@ -12,10 +12,10 @@ const checkToken = setInterval(async () => {
     const status = document.getElementById("status");
     try {
       await saveToken(token);
-      document.body.removeAttribute("data-gpi-token");
+      delete document.body.dataset.gpiToken;
       if (status) status.textContent = "Sign-in saved. You can close this tab.";
     } catch {
-      document.body.removeAttribute("data-gpi-token");
+      delete document.body.dataset.gpiToken;
       if (status) status.textContent = "Could not save sign-in. Please reopen the extension and try again.";
     }
   }

@@ -14,7 +14,7 @@ export function isProfilePage() {
 }
 
 export function getProfileUsername() {
-  return window.location.pathname.split("/").filter(Boolean)[0];
+  return window.location.pathname.split("/").find(Boolean);
 }
 
 export function formatNumber(num) {

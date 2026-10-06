@@ -27,5 +27,7 @@ if (expected) {
   if (version !== expected) {
     throw new Error(`Chrome Web Store holds ${version}, expected ${expected}. The upload did not reach the store.`);
   }
-  console.log(`Verified the store holds ${expected}. Public rollout follows store review.`);
+  // This proves the upload only. What users are served is reported by
+  // check-store-served.mjs, which needs no credentials.
+  console.log(`Verified the store item holds ${expected}.`);
 }

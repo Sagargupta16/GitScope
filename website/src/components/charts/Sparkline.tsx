@@ -14,12 +14,13 @@ export function Sparkline({
   color = "#238636",
   height = 24,
   width = 80,
-}: SparklineProps) {
+}: Readonly<SparklineProps>) {
   const gradient = useId();
   if (data.length < 2) return null;
+  const points = data.map((day) => `${day.date}: ${day.count}`).join(", ");
 
   return (
-    <div role="img" aria-label={`Traffic from ${data[0].date} to ${data[data.length - 1].date}: ${data.map((day) => `${day.date}: ${day.count}`).join(", ")}`} style={{ width, height }} className="inline-block">
+    <div role="img" aria-label={`Traffic from ${data[0].date} to ${data.at(-1)?.date}: ${points}`} style={{ width, height }} className="inline-block">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart accessibilityLayer={false} data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
           <defs>

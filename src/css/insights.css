@@ -122,11 +122,7 @@
   transition: background 0.15s ease;
 }
 
-.gpi-heatmap-cell[data-level="0"] { background: var(--bgColor-neutral-muted, #ebedf0); }
-.gpi-heatmap-cell[data-level="1"] { background: #9be9a8; }
-.gpi-heatmap-cell[data-level="2"] { background: #40c463; }
-.gpi-heatmap-cell[data-level="3"] { background: #30a14e; }
-.gpi-heatmap-cell[data-level="4"] { background: #216e39; }
+/* Heatmap level colours are defined with the theme variables further down. */
 
 /* Contribution Donut */
 .gpi-contrib-section { padding: 12px 16px; }

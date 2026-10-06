@@ -12,7 +12,13 @@ function isFullStats(stats: ProfileStats): stats is FullProfileStats {
   return "totalContributions" in stats;
 }
 
-function ProfileCard({ stats }: { stats: ProfileStats }) {
+function compareStatus(authLoading: boolean, loading: boolean, loaded: boolean) {
+  if (authLoading) return "Checking sign-in…";
+  if (loading) return "Loading comparison…";
+  return loaded ? "Comparison loaded. " : "";
+}
+
+function ProfileCard({ stats }: Readonly<{ stats: ProfileStats }>) {
   const { user, totalStars, topLanguages, originalRepos, forkedRepos, totalForksReceived, languageCount, accountAge, followerRatio } = stats;
   const joinYear = new Date(user.created_at).getFullYear();
   const full = isFullStats(stats) ? stats : null;
@@ -104,7 +110,7 @@ function ProfileCard({ stats }: { stats: ProfileStats }) {
   );
 }
 
-function ComparisonTable({ left, right }: { left: ProfileStats; right: ProfileStats }) {
+function ComparisonTable({ left, right }: Readonly<{ left: ProfileStats; right: ProfileStats }>) {
   const fullLeft = isFullStats(left) ? left : null;
   const fullRight = isFullStats(right) ? right : null;
 
@@ -260,7 +266,7 @@ export function Compare() {
           Signed in{results && isFullStats(results.left) && isFullStats(results.right) && !warning ? " — contribution statistics loaded for both profiles." : "."}
         </p>}
         <p role="status" aria-live="polite" className="text-center text-sm text-[var(--color-github-muted)] mb-4">
-          {authLoading ? "Checking sign-in…" : loading ? "Loading comparison…" : results ? "Comparison loaded. " : ""}{warning}
+          {compareStatus(authLoading, loading, results !== null)}{warning}
         </p>
         {authError && <div className="text-center mb-4">
           <p role="alert" className="text-red-400 mb-2">{authError}</p>

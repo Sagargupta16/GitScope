@@ -119,6 +119,41 @@ async function identity(token: string): Promise<{ login: string; scopes: string[
 }
 export async function fetchAuthenticatedUser(token: string): Promise<string> { return (await identity(token)).login; }
 
+// Validates the OAuth callback in the URL fragment against this tab's pending
+// login and returns its token. The fragment and pending login are consumed
+// before any check, so a rejected callback cannot be replayed.
+function consumeCallback(params: URLSearchParams): string | null {
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
+  sessionStorage.removeItem(PENDING_KEY);
+  if (!pending || !Number.isFinite(pending.expires) || pending.expires < Date.now() || !params.get("state") || params.get("state") !== pending.state) {
+    throw new Error("This sign-in does not match this tab. Please start sign-in again.");
+  }
+  if (params.has("error")) throw new Error("GitHub sign-in was cancelled or failed. Please try again.");
+  const token = params.get("token");
+  // Keep a validated callback available for retry without leaving it in the URL.
+  pendingVerification = token;
+  return token;
+}
+
+// A confirmed-invalid token clears its own session; any other failure keeps the
+// previous session so a temporary outage does not sign the user out.
+function signInFailed(error: unknown, previous: StoredAuth | null, candidate: string | null) {
+  const invalidToken = error instanceof IdentityError && error.status === 401;
+  if (invalidToken) pendingVerification = null;
+  if (invalidToken && (!previous || candidate === previous.token)) {
+    clearAuth(false);
+  } else if (previous) {
+    sessionId = previous.sessionId || crypto.randomUUID();
+    update({ token: previous.token, login: previous.login, scopes: previous.scopes });
+  }
+  update({
+    error: error instanceof Error ? error.message : "Sign-in failed. Please try again.",
+    loading: false,
+    retryable: Boolean(candidate) && !invalidToken,
+  });
+}
+
 export function initializeAuth(): Promise<void> {
   if (initialized) return initialized;
   initialized = (async () => {
@@ -129,16 +164,7 @@ export function initializeAuth(): Promise<void> {
     let candidate: string | null = null;
     try {
       if (hasCallback) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-        const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
-        sessionStorage.removeItem(PENDING_KEY);
-        if (!pending || !Number.isFinite(pending.expires) || pending.expires < Date.now() || !params.get("state") || params.get("state") !== pending.state) {
-          throw new Error("This sign-in does not match this tab. Please start sign-in again.");
-        }
-        if (params.has("error")) throw new Error("GitHub sign-in was cancelled or failed. Please try again.");
-        candidate = params.get("token");
-        // Keep a validated callback available for retry without leaving it in the URL.
-        pendingVerification = candidate;
+        candidate = consumeCallback(params);
       } else {
         candidate = pendingVerification || previous?.token || localStorage.getItem("gitscope_token");
       }
@@ -152,19 +178,7 @@ export function initializeAuth(): Promise<void> {
       storeAuth(candidate, user.login, user.scopes);
     } catch (error) {
       if (generation !== requestGeneration) return;
-      const invalidToken = error instanceof IdentityError && error.status === 401;
-      if (invalidToken) pendingVerification = null;
-      if (invalidToken && (!previous || candidate === previous.token)) {
-        clearAuth(false);
-      } else if (previous) {
-        sessionId = previous.sessionId || crypto.randomUUID();
-        update({ token: previous.token, login: previous.login, scopes: previous.scopes });
-      }
-      update({
-        error: error instanceof Error ? error.message : "Sign-in failed. Please try again.",
-        loading: false,
-        retryable: Boolean(candidate) && !invalidToken,
-      });
+      signInFailed(error, previous, candidate);
     }
   })();
   return initialized;
