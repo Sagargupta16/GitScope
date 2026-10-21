@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Sagargupta16/orrery/main/skills/orrery/references/diagram.schema.json
+# Rendered with orrery (github.com/Sagargupta16/orrery):
+#   orrery render images/diagrams/architecture.yaml -o images/diagrams/architecture -f svg --theme both
+# Reviewed at README width: orrery review images/diagrams/architecture.yaml --width 880
+title: GitScope architecture
+subtitle: The extension and the website call the GitHub API from your browser; only the Worker holds the OAuth client secret.
+direction: down
+layout:
+  merge: false
+story: [profile, content, sw, api]
+
+groups:
+  browser: { type: boundary, label: Your browser }
+  ext:
+    type: box
+    label: GitScope extension (Manifest V3)
+    icon: tabler:puzzle
+    in: browser
+    evidence: src/manifest.json:2#manifest_version
+
+nodes:
+  site:
+    icon: logos:react
+    label: GitScope website
+    note: React 19 on GitHub Pages
+    in: browser
+    evidence: [website/vite.config.ts:27#outDir, .github/workflows/pages.yml:68#deploy-pages]
+  profile:
+    icon: github:browser
+    label: github.com profile
+    note: stats panel in the sidebar
+    in: browser
+    evidence: src/js/dashboard.js:305#injectDashboard
+  signin:
+    icon: tabler:key
+    label: Sign-in
+    note: popup + OAuth callback
+    in: ext
+    evidence: [src/manifest.json:39#default_popup, src/manifest.json:33#auth-callback.js]
+  content:
+    icon: tabler:layout-sidebar-right
+    label: Content script
+    note: "detects profiles, 5 min cache"
+    in: ext
+    evidence: [src/manifest.json:24#content.js, src/js/api.js:191#getCached]
+  sw:
+    icon: tabler:engine
+    label: Service worker
+    note: "background.js, keeps the token"
+    in: ext
+    evidence: [src/manifest.json:13#service_worker, src/js/background.js:72#GPI_AUTH]
+  oauth:
+    icon: github:shield-lock
+    label: GitHub OAuth
+    note: authorize + token
+    align: worker
+    evidence: worker/index.js:84#authorize
+  worker:
+    icon: logos:cloudflare-workers-icon
+    label: gpi-auth Worker
+    note: "Cloudflare, holds the client secret"
+    evidence: [worker/wrangler.toml:1#gpi-auth, worker/index.js:123#client_secret]
+  api:
+    icon: logos:graphql
+    label: GitHub API
+    note: GraphQL + REST
+    evidence: [src/js/background.js:84#api.github.com/graphql, website/src/lib/http.ts:1#api.github.com]
+
+edges:
+  - content -> profile: { label: injects dashboard, constraint: false, evidence: src/js/content.js:74#injectDashboard }
+  - content -> sw: { label: runtime message, evidence: src/js/api.js:93#sendMessage }
+  - signin -> sw: { label: save token, evidence: src/js/auth-callback.js:14#saveToken }
+  - sw -> api: { label: parameterized GraphQL, evidence: src/js/background.js:84#fetch }
+  - signin -> worker: { label: /login, evidence: src/js/popup.js:38#AUTH_URL }
+  - site -> worker: { label: /web/login, evidence: website/src/lib/auth.ts:89#web/login }
+  - site -> api: { label: REST + GraphQL, evidence: website/src/lib/http.ts:73#fetch }
+  - worker -> oauth: { label: code exchange, evidence: worker/index.js:118#access_token }

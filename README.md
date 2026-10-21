@@ -71,23 +71,13 @@ Install directly from the [Chrome Web Store](https://chromewebstore.google.com/d
 
 ## How It Works
 
-```
-User visits github.com/<username>
-    |
-    v
-Content Script (content.js)
-    | detects profile page
-    v
-Background Worker (background.js)
-    | sends GraphQL query to api.github.com
-    | (parameterized variables - no injection)
-    v
-Dashboard (dashboard.js + charts.js)
-    | builds panel with stats, charts, heatmap
-    v
-Injected into GitHub sidebar
-    | cached for 5 minutes per profile
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/diagrams/architecture-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="images/diagrams/architecture-light.svg">
+  <img width="880" src="images/diagrams/architecture-light.svg" alt="GitScope architecture. In your browser, the GitScope extension (Manifest V3) has a sign-in part (the popup and the OAuth callback), a content script that detects github.com profiles, keeps a 5 minute cache and injects the stats dashboard into the profile sidebar, and a service worker that keeps the token and sends parameterized GraphQL queries to the GitHub API. The GitScope website, React 19 on GitHub Pages, calls the GitHub REST and GraphQL APIs. Both sign in through the gpi-auth Cloudflare Worker (/login for the extension, /web/login for the website), which holds the client secret and exchanges the code with GitHub OAuth.">
+</picture>
+
+The spec behind the picture is [`images/diagrams/architecture.yaml`](images/diagrams/architecture.yaml), rendered with [orrery](https://github.com/Sagargupta16/orrery).
 
 **Authentication** uses GitHub OAuth via a Cloudflare Worker (`worker/`). The worker holds the client secret server-side and validates a signed, short-lived browser-bound state cookie before exchanging the code. Website callbacks also verify the pending login in the initiating tab. Basic sign-in requests profile permissions; traffic analytics is a separate permission upgrade.
 
@@ -211,3 +201,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - Deploy the Worker first with `npx wrangler deploy --config worker/wrangler.toml`. `npm run check:auth` verifies the compatible OAuth protocol before client deployment.
 - Release-please manages extension versions. Merge its release PR after the fix PR; a GitHub ZIP and Chrome Web Store publication are separate delivery checks. Failed store uploads fail the release workflow.
 - After Pages deployment, run `npm run check:production` with `EXPECTED_SHA` set to the deployed commit. The check verifies the release marker, entry assets, SPA fallback, and OAuth service.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/diagrams/release-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="images/diagrams/release-light.svg">
+  <img width="880" src="images/diagrams/release-light.svg" alt="How GitScope ships. Every push to main runs release-please in release.yml, which keeps a release PR that bumps the versions. Merging that PR runs build-and-release (tests, build, zip), which checks the gpi-auth Worker's /health, attaches the zip to the GitHub Release and hands the same zip to publish-to-chrome, which uploads it to the Chrome Web Store and then checks that the store holds the version. Pushes that change website/ run pages.yml, which tests and builds the website, checks the Worker's /health and deploys docs/ to GitHub Pages. The Worker itself is deployed by hand with wrangler.">
+</picture>
+
+The spec behind the picture is [`images/diagrams/release.yaml`](images/diagrams/release.yaml), rendered with [orrery](https://github.com/Sagargupta16/orrery).
