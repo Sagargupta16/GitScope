@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Sagargupta16/orrery/main/skills/orrery/references/diagram.schema.json
+# Rendered with orrery (github.com/Sagargupta16/orrery):
+#   orrery render images/diagrams/release.yaml -o images/diagrams/release -f svg --theme both
+# Reviewed at README width: orrery review images/diagrams/release.yaml --width 880
+title: How GitScope ships
+subtitle: Both workflows check the Worker's /health before they publish; the Worker itself is deployed by hand with wrangler.
+direction: down
+story: [main, rp, build, publish, cws]
+
+groups:
+  release: { type: box, label: release.yml, cols: 3, icon: logos:github-actions, evidence: .github/workflows/release.yml:1#Release }
+  pages-wf: { type: box, label: pages.yml, icon: logos:github-actions, evidence: .github/workflows/pages.yml:1#Pages }
+
+nodes:
+  main:
+    icon: github:git-commit
+    label: Push to main
+    note: conventional commits
+    evidence: .github/workflows/release.yml:5#branches
+  site:
+    icon: github:browser
+    label: Website build
+    note: "tests, pnpm build"
+    in: pages-wf
+    evidence: .github/workflows/pages.yml:45#pnpm build
+  rp:
+    icon: github:git-pull-request
+    label: release-please
+    note: release PR bumps versions
+    in: release
+    evidence: .github/workflows/release.yml:25#release-please-action
+  build:
+    icon: github:package
+    label: build-and-release
+    note: "tests, build, zip"
+    in: release
+    evidence: [.github/workflows/release.yml:31#build-and-release, .github/workflows/release.yml:66#zip]
+  publish:
+    icon: github:upload
+    label: publish-to-chrome
+    note: "upload, then check the store"
+    in: release
+    evidence: [.github/workflows/release.yml:101#chrome-extension-upload, .github/workflows/release.yml:120#check-store-version]
+  pages:
+    icon: github:globe
+    label: GitHub Pages
+    note: serves docs/
+    evidence: .github/workflows/pages.yml:68#deploy-pages
+  worker:
+    icon: logos:cloudflare-workers-icon
+    label: gpi-auth Worker
+    note: /health says state-v1
+    evidence: scripts/check-production.mjs:11#health
+  ghrelease:
+    icon: github:release
+    label: GitHub Release
+    note: gitscope-vX.Y.Z.zip
+    evidence: .github/workflows/release.yml:75#action-gh-release
+  cws:
+    icon: si:chromewebstore
+    label: Chrome Web Store
+    evidence: .github/workflows/release.yml:101#chrome-extension-upload
+
+edges:
+  - main -> rp: { label: every push, evidence: .github/workflows/release.yml:5#branches }
+  - main -> site: { label: website/ changed, evidence: .github/workflows/pages.yml:6#paths }
+  - rp -> build: { label: release PR merged, evidence: .github/workflows/release.yml:34#release_created }
+  - build -> ghrelease: attach zip
+  - build -> publish: { label: same zip, evidence: .github/workflows/release.yml:91#download-artifact }
+  - publish -> cws: upload + version check
+  - build -> worker: { label: /health, evidence: .github/workflows/release.yml:63#check-production }
+  - site -> worker: { label: /health, evidence: .github/workflows/pages.yml:49#check-production }
+  - site -> pages: { label: deploy docs/, evidence: .github/workflows/pages.yml:53#upload-pages-artifact }
