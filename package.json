@@ -22,5 +22,8 @@
   "devDependencies": {
     "esbuild": "^0.28.1",
     "wrangler": "^4.149.0"
+  },
+  "overrides": {
+    "undici": "^7.30.1"
   }
 }
