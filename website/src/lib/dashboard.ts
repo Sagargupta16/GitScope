@@ -84,6 +84,27 @@ function validCount(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
 }
 
+// The built traffic for one settled endpoint, or null after recording why it is
+// unavailable. build runs inside the guard, so malformed entries count as invalid.
+function settledTraffic<T extends { count: number; uniques: number }, R>(
+  settled: PromiseSettledResult<T>,
+  label: string,
+  warnings: string[],
+  build: (value: T) => R,
+): R | null {
+  if (settled.status === "rejected") {
+    warnings.push(`${label} unavailable. ${errorMessage(settled.reason)}`);
+    return null;
+  }
+  try {
+    if (!validCount(settled.value?.count) || !validCount(settled.value?.uniques)) throw new Error("Invalid traffic");
+    return build(settled.value);
+  } catch {
+    warnings.push(`${label} unavailable (invalid response).`);
+    return null;
+  }
+}
+
 // Each endpoint settles independently: denied clones must not erase valid views.
 async function fetchRepoTraffic(
   owner: string,
@@ -100,29 +121,18 @@ async function fetchRepoTraffic(
   throwIfAborted(signal);
   const result = unavailableTraffic(repo, "");
   result.warnings = [];
-  if (views.status === "fulfilled") {
-    try {
-      if (!validCount(views.value?.count) || !validCount(views.value?.uniques)) throw new Error("Invalid traffic");
-      result.views = {
-        status: "ok", count: views.value.count, uniques: views.value.uniques,
-        views: normalizeTrafficEntries(views.value.views),
-      };
-    } catch { result.warnings.push(`${repo}: views unavailable (invalid response).`); }
-  } else result.warnings.push(`${repo}: views unavailable. ${errorMessage(views.reason)}`);
-  if (clones.status === "fulfilled") {
-    try {
-      if (!validCount(clones.value?.count) || !validCount(clones.value?.uniques)) throw new Error("Invalid traffic");
-      result.clones = {
-        status: "ok", count: clones.value.count, uniques: clones.value.uniques,
-        clones: normalizeTrafficEntries(clones.value.clones),
-      };
-    } catch { result.warnings.push(`${repo}: clones unavailable (invalid response).`); }
-  } else result.warnings.push(`${repo}: clones unavailable. ${errorMessage(clones.reason)}`);
+  result.views = settledTraffic(views, `${repo}: views`, result.warnings, (value) => ({
+    status: "ok", count: value.count, uniques: value.uniques, views: normalizeTrafficEntries(value.views),
+  })) ?? result.views;
+  result.clones = settledTraffic(clones, `${repo}: clones`, result.warnings, (value) => ({
+    status: "ok", count: value.count, uniques: value.uniques, clones: normalizeTrafficEntries(value.clones),
+  })) ?? result.clones;
   if (referrers.status === "fulfilled" && Array.isArray(referrers.value) && referrers.value.every((referrer) =>
     typeof referrer?.referrer === "string" && validCount(referrer.count) && validCount(referrer.uniques))) {
     result.referrers = referrers.value;
   } else {
-    result.warnings.push(`${repo}: referrers unavailable.${referrers.status === "rejected" ? ` ${errorMessage(referrers.reason)}` : ""}`);
+    const reason = referrers.status === "rejected" ? ` ${errorMessage(referrers.reason)}` : "";
+    result.warnings.push(`${repo}: referrers unavailable.${reason}`);
   }
   return result;
 }

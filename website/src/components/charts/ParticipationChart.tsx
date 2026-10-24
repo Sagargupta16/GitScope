@@ -19,7 +19,7 @@ interface ParticipationChartProps {
 export function ParticipationChart({
   data,
   title = "Weekly Commits (last 52 weeks)",
-}: ParticipationChartProps) {
+}: Readonly<ParticipationChartProps>) {
   const gradient = useId();
   const formatted = data.all.map((total, i) => ({
     week: `W${i + 1}`,

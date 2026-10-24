@@ -28,7 +28,7 @@ export function TrafficAreaChart({
   secondaryColor = "#388bfd",
   uniqueLabel = "Unique",
   unavailable = false,
-}: TrafficAreaChartProps) {
+}: Readonly<TrafficAreaChartProps>) {
   const gradient = useId();
   if (data.length === 0 || unavailable) {
     return (

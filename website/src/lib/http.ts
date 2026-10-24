@@ -16,6 +16,27 @@ export class GitHubApiError extends Error {
   }
 }
 
+const STATUS_ERRORS: Partial<Record<number, [GitHubErrorKind, string]>> = {
+  401: ["unauthorized", "GitHub authentication failed. Please sign in again."],
+  403: ["forbidden", "GitHub denied access to this resource."],
+  404: ["not-found", "GitHub resource not found."],
+};
+
+// URL of the rel="next" entry in a Link header. Equivalent to matching
+// /<([^>]+)>;\s*rel="next"/, but each "<" is checked once against its own ">"
+// instead of the regex rescanning from every "<", which is quadratic.
+const REL_NEXT = /;\s*rel="next"/y;
+function nextLink(link: string | null): string | undefined {
+  if (!link) return undefined;
+  for (let open = link.indexOf("<"); open !== -1; open = link.indexOf("<", open + 1)) {
+    const close = link.indexOf(">", open + 1);
+    if (close === -1) return undefined;
+    REL_NEXT.lastIndex = close + 1;
+    if (close > open + 1 && REL_NEXT.test(link)) return link.slice(open + 1, close);
+  }
+  return undefined;
+}
+
 export function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw signal.reason ?? new DOMException("Request cancelled", "AbortError");
 }
@@ -33,13 +54,9 @@ function classify(status: number, headers: Headers, message: string): GitHubApiE
     "GitHub API rate limit exceeded. Please wait before refreshing.",
     "rate-limit", status, headers.get("retry-after") ?? headers.get("x-ratelimit-reset") ?? undefined,
   );
-  const kind = status === 401 ? "unauthorized" : status === 403 ? "forbidden"
-    : status === 404 ? "not-found" : "http";
-  const prefix = status === 401 ? "GitHub authentication failed. Please sign in again."
-    : status === 403 ? "GitHub denied access to this resource."
-    : status === 404 ? "GitHub resource not found."
-    : `GitHub API error: ${status}.`;
-  return new GitHubApiError(`${prefix}${message ? ` ${message}` : ""}`, kind, status);
+  const [kind, prefix] = STATUS_ERRORS[status] ?? ["http", `GitHub API error: ${status}.`];
+  const detail = message ? ` ${message}` : "";
+  return new GitHubApiError(`${prefix}${detail}`, kind, status);
 }
 
 function apiUrl(path: string): URL {
@@ -49,6 +66,60 @@ function apiUrl(path: string): URL {
     throw new GitHubApiError("Invalid GitHub pagination URL", "invalid-response");
   }
   return url;
+}
+
+function requestHeaders(init: RequestInit, token?: string): Headers {
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/vnd.github+json");
+  headers.set("X-GitHub-Api-Version", "2022-11-28");
+  if (token) headers.set("Authorization", `bearer ${token}`);
+  return headers;
+}
+
+// The parsed JSON body. An unparseable body is only an error on success; on an
+// error status the status itself is classified, without a message.
+async function readBody(res: Response, controller: AbortController): Promise<unknown> {
+  if (res.status === 202 || res.status === 204) {
+    throw new GitHubApiError("GitHub statistics are still being prepared.", "pending", res.status);
+  }
+  try { return await res.json(); } catch {
+    if (controller.signal.aborted) throw controller.signal.reason;
+    if (res.ok) throw new GitHubApiError("GitHub returned an invalid response.", "invalid-response", res.status);
+    return undefined;
+  }
+}
+
+function bodyMessage(body: unknown): string {
+  return body && typeof body === "object" && "message" in body ? String(body.message) : "";
+}
+
+// Adds items not already seen by key, returning how many were new.
+function appendUnseen<T>(all: T[], page: T[], seen: Set<string>, key?: (item: T) => string): number {
+  let added = 0;
+  for (const item of page) {
+    const id = key?.(item);
+    if (id !== undefined && seen.has(id)) continue;
+    if (id !== undefined) seen.add(id);
+    all.push(item);
+    added++;
+  }
+  return added;
+}
+
+// The next page to request, or null after the last one. Without a Link header a
+// full page may not be the last, so the page number is stepped on the same URL.
+function nextPageUrl(url: URL, link: string | null, pageLength: number): URL | null {
+  const next = nextLink(link);
+  if (next) {
+    const nextUrl = apiUrl(next);
+    if (nextUrl.pathname !== url.pathname) throw new GitHubApiError("Invalid GitHub pagination path.", "invalid-response");
+    return nextUrl;
+  }
+  if (!link && pageLength === 100) {
+    url.searchParams.set("page", String(Number(url.searchParams.get("page")) + 1));
+    return url;
+  }
+  return null;
 }
 
 /** One client per user operation. Once rate limited, no further requests start. */
@@ -66,22 +137,11 @@ export function createGitHubClient(token?: string, signal?: AbortSignal) {
       new GitHubApiError("GitHub request timed out. Please try again.", "timeout"),
     ), 15_000);
     try {
-      const headers = new Headers(init.headers);
-      headers.set("Accept", "application/vnd.github+json");
-      headers.set("X-GitHub-Api-Version", "2022-11-28");
-      if (token) headers.set("Authorization", `bearer ${token}`);
+      const headers = requestHeaders(init, token);
       const res = await fetch(url.toString(), { ...init, headers, signal: controller.signal });
-      if (res.status === 202 || res.status === 204) {
-        throw new GitHubApiError("GitHub statistics are still being prepared.", "pending", res.status);
-      }
-      let body: unknown;
-      try { body = await res.json(); } catch {
-        if (controller.signal.aborted) throw controller.signal.reason;
-        if (res.ok) throw new GitHubApiError("GitHub returned an invalid response.", "invalid-response", res.status);
-      }
+      const body = await readBody(res, controller);
       if (!res.ok) {
-        const message = body && typeof body === "object" && "message" in body ? String(body.message) : "";
-        const error = classify(res.status, res.headers, message);
+        const error = classify(res.status, res.headers, bodyMessage(body));
         if (error.kind === "rate-limit") rateError = error;
         throw error;
       }
@@ -139,25 +199,8 @@ export function createGitHubClient(token?: string, signal?: AbortSignal) {
       seenPages.add(url.href);
       const { data, headers } = await response<T[]>(url.href);
       if (!Array.isArray(data)) throw new GitHubApiError("GitHub returned an invalid page.", "invalid-response");
-      let added = 0;
-      for (const item of data) {
-        const id = key?.(item);
-        if (id !== undefined && seenItems.has(id)) continue;
-        if (id !== undefined) seenItems.add(id);
-        all.push(item);
-        added++;
-      }
-      const link = headers.get("link");
-      const next = link?.match(/<([^>]+)>;\s*rel="next"/)?.[1];
-      if (next) {
-        const nextUrl = apiUrl(next);
-        if (nextUrl.pathname !== url.pathname) throw new GitHubApiError("Invalid GitHub pagination path.", "invalid-response");
-        url = nextUrl;
-      } else if (!link && data.length === 100) {
-        url.searchParams.set("page", String(Number(url.searchParams.get("page")) + 1));
-      } else {
-        url = null;
-      }
+      const added = appendUnseen(all, data, seenItems, key);
+      url = nextPageUrl(url, headers.get("link"), data.length);
       if (url && key && added === 0) throw new GitHubApiError("GitHub pagination did not advance.", "invalid-response");
     }
     return all;

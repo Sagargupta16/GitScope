@@ -21,10 +21,31 @@ jobs:
           CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
         run: node scripts/check-store-auth.mjs
 
-      - name: Report the version the store has published
+      # Runs even when the credential step above failed, because it needs no
+      # credentials and answers the question that matters: what do users have.
+      - name: Report the version Chrome serves users
+        if: always()
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: node scripts/check-store-served.mjs
+
+      - name: Report the version the store item holds
         env:
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
           CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
         run: node scripts/check-store-version.mjs
+
+      # chrome-extension-upload v7 fails without it, so catch it before a release does.
+      # Independent of the credential steps above, so it always reports.
+      - name: Check the publisher ID is configured
+        if: always()
+        env:
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+        run: |
+          if [ -z "${CHROME_PUBLISHER_ID}" ]; then
+            echo "::error::CHROME_PUBLISHER_ID is not set. Add it from Publisher > Settings in the Chrome Web Store Developer Dashboard."
+            exit 1
+          fi
+          echo "CHROME_PUBLISHER_ID is configured."

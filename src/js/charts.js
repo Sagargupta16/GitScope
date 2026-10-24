@@ -31,8 +31,9 @@ function keyboardChart(container, items) {
       const delta = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
       if (delta === undefined && event.key !== "Home" && event.key !== "End") return;
       event.preventDefault();
-      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 :
-        Math.max(0, Math.min(items.length - 1, index + delta));
+      let next = Math.max(0, Math.min(items.length - 1, index + delta));
+      if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = items.length - 1;
       items[next].focus();
     });
   }
@@ -81,7 +82,8 @@ export function computeStreaks(calendar, now = new Date()) {
   let cursor = Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00Z`);
   const dateAt = time => new Date(time).toISOString().slice(0, 10);
   // Today can still be in progress; yesterday cannot be skipped.
-  if (!(byDate.get(dateAt(cursor)) > 0)) cursor -= DAY_MS;
+  // A missing date counts as zero, so it skips the same way an empty day does.
+  if ((byDate.get(dateAt(cursor)) ?? 0) <= 0) cursor -= DAY_MS;
   let currentStreak = 0;
   while (byDate.get(dateAt(cursor)) > 0) {
     currentStreak++;
@@ -122,6 +124,15 @@ export function computeStreaks(calendar, now = new Date()) {
   return { currentStreak, longestStreak, busiestDay, mostActiveWeekday, dayOfWeekCounts, dayNames };
 }
 
+// Intensity band 0-4 for a day's contribution count, matching the data-level CSS.
+function heatmapLevel(count) {
+  if (count === 0) return 0;
+  if (count <= 3) return 1;
+  if (count <= 6) return 2;
+  if (count <= 9) return 3;
+  return 4;
+}
+
 export function renderMiniHeatmap(calendar) {
   const wrapper = document.createElement("div");
 
@@ -141,9 +152,7 @@ export function renderMiniHeatmap(calendar) {
       cell.className = "gpi-heatmap-cell";
       cell.title = `${day.date}: ${day.contributionCount} contributions`;
 
-      const count = day.contributionCount;
-      const level = count === 0 ? 0 : count <= 3 ? 1 : count <= 6 ? 2 : count <= 9 ? 3 : 4;
-      cell.setAttribute("data-level", level);
+      cell.dataset.level = heatmapLevel(day.contributionCount);
       cell.style.marginTop = col.children.length === 0 ? `${day.weekday * 12}px` : "0";
 
       col.appendChild(cell);

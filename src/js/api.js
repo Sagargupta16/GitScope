@@ -117,6 +117,39 @@ function buildContribWindows(now = new Date(), chunks = CONTRIB_CHUNKS) {
 
 // Merge complete, non-overlapping date windows. Calendar padding is filtered
 // before this step; duplicate dates must agree instead of silently hiding errors.
+function addTotals(totals, cc) {
+  for (const key of Object.keys(totals)) {
+    if (!Number.isInteger(cc[key]) || cc[key] < 0) throw new Error("Incomplete contribution totals");
+    totals[key] += cc[key];
+  }
+}
+
+function addDays(daysByDate, weeks) {
+  for (const week of weeks) {
+    for (const day of week.contributionDays) {
+      const previous = daysByDate.get(day.date);
+      if (previous && previous.contributionCount !== day.contributionCount) {
+        throw new Error("Inconsistent contribution calendar");
+      }
+      daysByDate.set(day.date, day);
+    }
+  }
+}
+
+// Regroup into weeks aligned on weekday (0 = Sunday), matching GitHub's layout.
+function groupByWeek(days) {
+  const weeks = [];
+  let current = null;
+  for (const day of days) {
+    if (day.weekday === 0 || current === null) {
+      current = { contributionDays: [] };
+      weeks.push(current);
+    }
+    current.contributionDays.push(day);
+  }
+  return weeks;
+}
+
 function mergeContributions(chunks) {
   const totals = {
     totalCommitContributions: 0,
@@ -128,35 +161,13 @@ function mergeContributions(chunks) {
 
   const daysByDate = new Map();
   for (const cc of chunks) {
-    for (const key of Object.keys(totals)) {
-      if (!Number.isInteger(cc[key]) || cc[key] < 0) throw new Error("Incomplete contribution totals");
-      totals[key] += cc[key];
-    }
-    const weeks = cc.contributionCalendar?.weeks ?? [];
-    for (const week of weeks) {
-      for (const day of week.contributionDays) {
-        const previous = daysByDate.get(day.date);
-        if (previous && previous.contributionCount !== day.contributionCount) {
-          throw new Error("Inconsistent contribution calendar");
-        }
-        daysByDate.set(day.date, day);
-      }
-    }
+    addTotals(totals, cc);
+    addDays(daysByDate, cc.contributionCalendar?.weeks ?? []);
   }
 
   const days = [...daysByDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   const totalContributions = days.reduce((s, d) => s + d.contributionCount, 0);
-
-  // Regroup into weeks aligned on weekday (0 = Sunday), matching GitHub's layout.
-  const regrouped = [];
-  let current = null;
-  for (const day of days) {
-    if (day.weekday === 0 || current === null) {
-      current = { contributionDays: [] };
-      regrouped.push(current);
-    }
-    current.contributionDays.push(day);
-  }
+  const regrouped = groupByWeek(days);
 
   return {
     ...totals,
@@ -213,6 +224,61 @@ export function fetchAuthenticatedViewer(token) {
   });
 }
 
+// The day to keep, or null when it is calendar padding outside [from, to].
+// Checks run in this order so padding is skipped before its count is judged.
+function checkedDay(day, from, to) {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day.date)) throw new Error("Invalid contribution date");
+  if (day.date < from || day.date > to) return null;
+  if (!Number.isInteger(day.contributionCount) || day.contributionCount < 0) {
+    throw new Error("Invalid contribution count");
+  }
+  return day;
+}
+
+// Validated days for one window, keyed by date and stamped with a UTC weekday.
+function windowDays(weeks, window) {
+  const from = window.from.slice(0, 10);
+  const to = window.to.slice(0, 10);
+  const days = new Map();
+  for (const week of weeks) {
+    if (!Array.isArray(week.contributionDays)) throw new Error("Incomplete contribution calendar");
+    for (const raw of week.contributionDays) {
+      const day = checkedDay(raw, from, to);
+      if (!day) continue;
+      const previous = days.get(day.date);
+      if (previous && previous.contributionCount !== day.contributionCount) {
+        throw new Error("Inconsistent contribution calendar");
+      }
+      days.set(day.date, { ...day, weekday: new Date(`${day.date}T00:00:00Z`).getUTCDay() });
+    }
+  }
+  return days;
+}
+
+function assertEveryDate(days, window) {
+  for (let time = Date.parse(window.from); time <= Date.parse(window.to); time += 86400000) {
+    if (!days.has(new Date(time).toISOString().slice(0, 10))) throw new Error("Incomplete contribution calendar");
+  }
+}
+
+async function fetchContributionWindow(username, token, window) {
+  const result = await sendMessage({
+    type: "GPI_GRAPHQL", token, query: CONTRIB_QUERY,
+    variables: { username, ...window },
+  });
+  const cc = result.user?.contributionsCollection;
+  if (!Array.isArray(cc?.contributionCalendar?.weeks)) throw new Error("Incomplete contribution history");
+  const days = windowDays(cc.contributionCalendar.weeks, window);
+  assertEveryDate(days, window);
+  return {
+    ...cc,
+    contributionCalendar: {
+      ...cc.contributionCalendar,
+      weeks: [{ contributionDays: [...days.values()] }],
+    },
+  };
+}
+
 export function fetchProfileInsights(username, token) {
   username = username.toLowerCase();
   return cachedRequest(`profile_${username}`, token, async () => {
@@ -245,40 +311,7 @@ export function fetchProfileInsights(username, token) {
     if (repos.size !== expectedRepos) throw new Error("Incomplete repository data. Please retry.");
     core.user.repositories.nodes = [...repos.values()].sort((a, b) => b.stargazerCount - a.stargazerCount);
 
-    const chunks = await Promise.all(buildContribWindows().map(async window => {
-      const result = await sendMessage({
-        type: "GPI_GRAPHQL", token, query: CONTRIB_QUERY,
-        variables: { username, ...window },
-      });
-      const cc = result.user?.contributionsCollection;
-      if (!Array.isArray(cc?.contributionCalendar?.weeks)) throw new Error("Incomplete contribution history");
-      const days = new Map();
-      // Ignore any calendar padding outside the requested date range.
-      for (const week of cc.contributionCalendar.weeks) {
-        if (!Array.isArray(week.contributionDays)) throw new Error("Incomplete contribution calendar");
-        for (const day of week.contributionDays) {
-          if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day.date)) throw new Error("Invalid contribution date");
-          if (day.date < window.from.slice(0, 10) || day.date > window.to.slice(0, 10)) continue;
-          if (!Number.isInteger(day.contributionCount) || day.contributionCount < 0) {
-            throw new Error("Invalid contribution count");
-          }
-          if (days.has(day.date) && days.get(day.date).contributionCount !== day.contributionCount) {
-            throw new Error("Inconsistent contribution calendar");
-          }
-          days.set(day.date, { ...day, weekday: new Date(`${day.date}T00:00:00Z`).getUTCDay() });
-        }
-      }
-      for (let time = Date.parse(window.from); time <= Date.parse(window.to); time += 86400000) {
-        if (!days.has(new Date(time).toISOString().slice(0, 10))) throw new Error("Incomplete contribution calendar");
-      }
-      return {
-        ...cc,
-        contributionCalendar: {
-          ...cc.contributionCalendar,
-          weeks: [{ contributionDays: [...days.values()] }],
-        },
-      };
-    }));
+    const chunks = await Promise.all(buildContribWindows().map(window => fetchContributionWindow(username, token, window)));
     core.user.contributionsCollection = mergeContributions(chunks);
     return core;
   });
