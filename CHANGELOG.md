@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4](https://github.com/Sagargupta16/GitScope/compare/v1.2.3...v1.2.4) (2026-10-24)
+
+
+### Bug Fixes
+
+* **deps:** patch undici to 7.30.1 ([#60](https://github.com/Sagargupta16/GitScope/issues/60)) ([dda376b](https://github.com/Sagargupta16/GitScope/commit/dda376b95954005a420f7851dcd1bbfc44b002cb))
+* stop reporting unpublished releases as published and clear SonarCloud findings ([#56](https://github.com/Sagargupta16/GitScope/issues/56)) ([6210d43](https://github.com/Sagargupta16/GitScope/commit/6210d43a40aa6a4491504f1575ee706b62329fb8))
+
 ## [1.2.3](https://github.com/Sagargupta16/GitScope/compare/v1.2.2...v1.2.3) (2026-09-19)
 
 
