@@ -48,7 +48,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
 
       # Dependency lifecycle scripts are not needed to build or test this repo,
       # so skip them rather than run arbitrary install-time code in a release.
@@ -91,7 +91,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
 
       - uses: actions/download-artifact@v8
         with:
