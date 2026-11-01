@@ -70,7 +70,7 @@ pnpm --dir website build
 Deploy the compatible OAuth Worker before the clients, then run `npm run check:auth`.
 After Pages deploys, run `npm run check:production` with `EXPECTED_SHA` set to the
 deployed commit. Release readiness checks Chrome Web Store access without
-publishing. The release workflow submits the same tested zip attached to the
+publishing; it runs on the release-please PR and on manual dispatch only. The release workflow submits the same tested zip attached to the
 GitHub Release; confirm the public store version after review before calling it published.
 
 ## Pull Requests

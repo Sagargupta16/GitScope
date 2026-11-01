@@ -6,7 +6,9 @@ permissions:
   contents: read
 jobs:
   chrome-access:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    # Only the release-please PR needs store credentials; on every other PR an
+    # expired login turned unrelated PRs red.
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
