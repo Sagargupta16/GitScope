@@ -64,3 +64,9 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   .leaderboard-row .leaderboard-metrics { flex-basis: 100%; justify-content: space-between; gap: .25rem; }
   .leaderboard-row .leaderboard-metrics > div { min-width: 0; }
 }
+
+/* Achievements: cards rise in one by one, progress bars fill from the left. */
+.badge-card { animation: badge-rise 0.45s ease-out both; }
+.badge-bar { animation: badge-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: left; }
+@keyframes badge-rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes badge-fill { from { transform: scaleX(0); } }

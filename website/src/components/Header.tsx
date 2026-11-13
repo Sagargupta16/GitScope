@@ -51,6 +51,15 @@ export function Header() {
             Leaderboard
           </Link>
           <Link
+            to="/achievements"
+            aria-current={pathname === "/achievements" ? "page" : undefined}
+            className={`text-sm no-underline transition-colors ${
+              pathname === "/achievements" ? "text-white" : "text-[var(--color-github-muted)] hover:text-white"
+            }`}
+          >
+            Achievements
+          </Link>
+          <Link
             to="/dashboard"
             aria-current={onDashboard ? "page" : undefined}
             className={`text-sm no-underline transition-colors ${

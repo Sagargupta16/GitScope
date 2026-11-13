@@ -23,6 +23,8 @@ function spa404(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), spa404()],
   base: "/GitScope/",
+  // The badge definitions live in ../shared so the extension reads the same file.
+  server: { fs: { allow: [".."] } },
   build: {
     outDir: "../docs",
     emptyOutDir: true,

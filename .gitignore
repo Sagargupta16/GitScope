@@ -28,3 +28,6 @@ worker/.wrangler/
 .env.*.local
 *.log
 .next/
+
+# Local scratch files
+.scratch/

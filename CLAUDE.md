@@ -63,6 +63,7 @@ npx wrangler deploy      # Deploy to Cloudflare
 - Leaderboard data cached in `localStorage` with 10-min TTL to avoid GitHub API rate limits
 - Dashboard data cached in `localStorage` with 5-min TTL; "Sync Now" button for manual refresh
 - Extension GraphQL fetches core counts, paginated repositories, authenticated viewer identity, and four bounded contribution windows
+- Achievements: definitions, tier thresholds and Octicon paths live once in `shared/achievements.json`, imported by `src/js/achievements.js` (extension) and `website/src/lib/achievements.ts`. GitHub publishes no thresholds; the official ones were checked against a live profile (Pull Shark 2,189 -> x4, Galaxy Brain 14 countable answers -> x2). Galaxy Brain excludes community/community (achievements off there, #106536) and self-asked discussions. The extension reads earned tiers from the profile page DOM (`img.achievement-badge-sidebar` plus `.achievement-tier-label`); the website cannot (no CORS on github.com), so it shows count-based tiers. All counts come from one batched GraphQL query plus one code search, loaded after the main panel
 
 ## Deployment
 

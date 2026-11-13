@@ -12,6 +12,7 @@
 //      the single `contributionsCollection` shape the rest of the code expects.
 
 import { getCached, setCache, getCacheContext } from "./storage.js";
+import { searchQueries, countableAnswers, firstTimeContributions, accountYears } from "./achievements.js";
 
 const REPO_FIELDS = `
   totalCount
@@ -314,5 +315,109 @@ export function fetchProfileInsights(username, token) {
     const chunks = await Promise.all(buildContribWindows().map(window => fetchContributionWindow(username, token, window)));
     core.user.contributionsCollection = mergeContributions(chunks);
     return core;
+  });
+}
+
+// Every count-only search shares one request; GitHub scores it at 1 point.
+const ACHIEVEMENTS_QUERY = `
+  query Achievements($login: String!, $pullShark: String!, $openSourcerer: String!,
+    $reviewer: String!, $bugReporter: String!, $maintainer: String!) {
+    user(login: $login) {
+      createdAt
+      repositories(ownerAffiliations: OWNER, first: 1, orderBy: {field: STARGAZERS, direction: DESC}) {
+        nodes { stargazerCount }
+      }
+      answers: repositoryDiscussionComments(onlyAnswers: true, first: 100) {
+        totalCount
+        nodes { discussion { author { login } repository { nameWithOwner } } }
+      }
+      issueComments(last: 100) { nodes { reactions(content: HEART) { totalCount } } }
+      discussionComments: repositoryDiscussionComments(last: 100) {
+        nodes { reactions(content: HEART) { totalCount } }
+      }
+    }
+    pullShark: search(type: ISSUE, query: $pullShark, first: 1) { issueCount }
+    openSourcerer: search(type: ISSUE, query: $openSourcerer, first: 1) { issueCount }
+    reviewer: search(type: ISSUE, query: $reviewer, first: 1) { issueCount }
+    bugReporter: search(type: ISSUE, query: $bugReporter, first: 1) { issueCount }
+    maintainer: search(type: ISSUE, query: $maintainer, first: 100) { ...MaintainerPage }
+  }
+  fragment MaintainerPage on SearchResultItemConnection {
+    issueCount
+    pageInfo { hasNextPage endCursor }
+    nodes { ... on PullRequest { author { __typename login } repository { nameWithOwner } } }
+  }
+`;
+
+const MAINTAINER_QUERY = `
+  query MaintainerPage($query: String!, $after: String!) {
+    search(type: ISSUE, query: $query, first: 100, after: $after) {
+      issueCount
+      pageInfo { hasNextPage endCursor }
+      nodes { ... on PullRequest { author { __typename login } repository { nameWithOwner } } }
+    }
+  }
+`;
+
+// Each search page takes seconds, so first-time contributors stop after 300
+// merged pull requests and report "at least".
+const MAINTAINER_PAGES = 3;
+
+const heartTotal = nodes => (nodes ?? []).reduce((sum, node) => sum + (node?.reactions?.totalCount ?? 0), 0);
+
+function sendCodeSearch(token, query) {
+  return new Promise(resolve => {
+    chrome.runtime.sendMessage({ type: "GPI_CODE_SEARCH", token, query }, response => {
+      resolve(chrome.runtime.lastError ? null : response ?? null);
+    });
+  });
+}
+
+async function maintainerNodes(token, query, first) {
+  const nodes = [...(first.nodes ?? [])];
+  let page = first;
+  for (let pages = 1; page.pageInfo?.hasNextPage && pages < MAINTAINER_PAGES; pages++) {
+    const next = await sendMessage({
+      type: "GPI_GRAPHQL", token, query: MAINTAINER_QUERY, variables: { query, after: page.pageInfo.endCursor },
+    });
+    page = next.search;
+    nodes.push(...(page?.nodes ?? []));
+  }
+  return { nodes, truncated: Boolean(page?.pageInfo?.hasNextPage) };
+}
+
+export function fetchAchievementMetrics(username, token) {
+  const login = username.toLowerCase();
+  return cachedRequest(`achievements_${login}`, token, async () => {
+    const queries = searchQueries(login);
+    const [data, publisher] = await Promise.all([
+      sendMessage({
+        type: "GPI_GRAPHQL", token, query: ACHIEVEMENTS_QUERY,
+        variables: {
+          login, pullShark: queries.pullShark, openSourcerer: queries.openSourcerer,
+          reviewer: queries.reviewer, bugReporter: queries.bugReporter, maintainer: queries.maintainer,
+        },
+      }),
+      sendCodeSearch(token, queries.publisher),
+    ]);
+    if (!data.user) throw new Error("Profile not found");
+    const maintainer = await maintainerNodes(token, queries.maintainer, data.maintainer);
+    const answers = data.user.answers;
+    return {
+      mergedPullRequests: data.pullShark.issueCount,
+      topRepositoryStars: data.user.repositories.nodes[0]?.stargazerCount ?? 0,
+      acceptedAnswers: countableAnswers(answers.nodes, login),
+      externalMergedPullRequests: data.openSourcerer.issueCount,
+      hearts: heartTotal(data.user.issueComments.nodes) + heartTotal(data.user.discussionComments.nodes),
+      reviewedMergedPullRequests: data.reviewer.issueCount,
+      fixedIssues: data.bugReporter.issueCount,
+      firstTimeContributors: firstTimeContributions(maintainer.nodes),
+      actionDependents: Number.isInteger(publisher?.total_count) ? publisher.total_count : null,
+      accountYears: accountYears(data.user.createdAt),
+      atLeast: {
+        acceptedAnswers: answers.totalCount > answers.nodes.length,
+        firstTimeContributors: maintainer.truncated,
+      },
+    };
   });
 }

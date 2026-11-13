@@ -2,10 +2,11 @@
 
 import { isProfilePage, getProfileUsername } from "./utils.js";
 import { getSavedToken, saveViewerStats, getViewerStats } from "./storage.js";
-import { fetchProfileInsights, fetchAuthenticatedViewer } from "./api.js";
+import { fetchProfileInsights, fetchAuthenticatedViewer, fetchAchievementMetrics } from "./api.js";
+import { readEarnedAchievements } from "./achievements.js";
 import {
   buildInsightsPanel, injectDashboard, showTokenPrompt, showLoadingSkeleton,
-  showErrorState, getDashboardTarget, removeDashboard,
+  showErrorState, getDashboardTarget, removeDashboard, buildAchievementsSection, showAchievements,
 } from "./dashboard.js";
 
 let generation = 0;
@@ -46,6 +47,22 @@ async function comparisonStats(data, viewer, token, isCurrent) {
   return stats;
 }
 
+// Loads after the panel so the slower searches never hold it back. The profile
+// page lists earned badges, so they are read from it rather than requested.
+async function loadAchievements(panel, username, token, isCurrent) {
+  const found = readEarnedAchievements(document);
+  const earned = found.size ? found : null;
+  showAchievements(panel, buildAchievementsSection("loading"));
+  try {
+    const metrics = await fetchAchievementMetrics(username, token);
+    if (isCurrent() && panel.isConnected) showAchievements(panel, buildAchievementsSection("ready", metrics, earned));
+  } catch (err) {
+    if (!isCurrent() || !panel.isConnected) return;
+    console.error("[GPI] Achievements:", err);
+    showAchievements(panel, buildAchievementsSection("error", null, earned));
+  }
+}
+
 async function init(force = false) {
   if (navigating) return;
   const route = window.location.href;
@@ -78,6 +95,7 @@ async function init(force = false) {
     if (viewerStats === STALE || !isCurrent()) return;
     const panel = buildInsightsPanel(data, viewerStats);
     injectDashboard(panel);
+    void loadAchievements(panel, username, token, isCurrent);
   } catch (err) {
     if (!isCurrent()) return;
     console.error("[GPI] Error:", err);

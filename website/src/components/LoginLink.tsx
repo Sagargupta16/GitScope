@@ -10,7 +10,7 @@ let pendingReturn: { path: string; timestamp: number; session: string } | null =
 try { pendingReturn = JSON.parse(sessionStorage.getItem(RETURN_KEY) ?? "null"); } catch { /* Optional storage. */ }
 
 function validReturnPath(path: unknown): path is string {
-  return typeof path === "string" && /^\/(?:compare(?:\?[^#]*)?|leaderboard|dashboard(?:\/repo\/[^/?#]+)?)$/.test(path);
+  return typeof path === "string" && /^\/(?:compare(?:\?[^#]*)?|achievements(?:\?[^#]*)?|leaderboard|dashboard(?:\/repo\/[^/?#]+)?)$/.test(path);
 }
 
 /** Keep query parameters/repository paths while the worker accepts page names only. */

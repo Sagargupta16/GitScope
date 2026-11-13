@@ -4,7 +4,7 @@ GitScope extension and website. Updated September 19, 2026.
 
 ## GitHub data
 
-GitScope reads profile information, contribution calendars, repository metadata, pull requests, issues, organizations, and following lists to display analytics. Traffic analytics also reads views, clones, referrers, and repository activity. Repository permissions can include private repository metadata.
+GitScope reads profile information, contribution calendars, repository metadata, pull requests, issues, organizations, and following lists to display analytics. Achievement badges also read public counts of merged and reviewed pull requests, issues closed by a linked pull request, accepted discussion answers, hearts on recent comments, and workflow files in other repositories that use your Actions (through GitHub code search). On a profile page, the extension reads the badges GitHub already shows there. Traffic analytics also reads views, clones, referrers, and repository activity. Repository permissions can include private repository metadata.
 
 GitScope makes read requests to GitHub. It does not create, modify, or delete repositories. The website's optional classic OAuth `repo` scope nevertheless grants broad repository permissions, including write capability. Basic website sign-in does not explicitly request this scope; enabling traffic analytics requests it separately. GitHub may retain permissions you previously granted to the same OAuth app.
 

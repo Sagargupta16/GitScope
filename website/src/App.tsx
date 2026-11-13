@@ -11,6 +11,7 @@ const Compare = lazy(() => import("./pages/Compare").then((m) => ({ default: m.C
 const Leaderboard = lazy(() => import("./pages/Leaderboard").then((m) => ({ default: m.Leaderboard })));
 const Privacy = lazy(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })));
+const Achievements = lazy(() => import("./pages/Achievements").then((m) => ({ default: m.Achievements })));
 const RepoDetail = lazy(() => import("./pages/RepoDetail").then((m) => ({ default: m.RepoDetail })));
 
 export function App() {
@@ -28,6 +29,7 @@ export function App() {
               <Route path="/" element={<Landing />} />
               <Route path="/compare" element={<Compare />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/achievements" element={<Achievements />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dashboard/repo/:name" element={<RepoDetail />} />
               <Route path="/privacy" element={<Privacy />} />

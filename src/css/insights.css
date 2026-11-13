@@ -435,3 +435,65 @@
     transition: none !important;
   }
 }
+
+/* Achievements */
+.gpi-badge-group { margin-top: 8px; }
+.gpi-badge-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fgColor-default, #24292f);
+  margin-bottom: 4px;
+}
+.gpi-badge-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-top: 1px solid var(--borderColor-muted, #d8dee4);
+}
+.gpi-badge-row[data-level="0"] .gpi-badge-ring,
+.gpi-badge-chip[data-level="0"] .gpi-badge-ring {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+}
+.gpi-badge-ring img { width: 34px; height: 34px; }
+.gpi-badge-body { min-width: 0; flex: 1; }
+.gpi-badge-head { display: flex; align-items: center; gap: 6px; }
+.gpi-badge-name { font-size: 12px; font-weight: 600; color: var(--fgColor-default, #24292f); }
+.gpi-badge-rule, .gpi-badge-count, .gpi-badge-status { font-size: 11px; color: var(--fgColor-muted, #656d76); line-height: 1.35; }
+.gpi-badge-status { margin: 4px 0 0; }
+.gpi-tier { font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 10px; color: #1f2328; }
+.gpi-tier-2 { background: #f9bc9c; }
+.gpi-tier-3 { background: #d9dee3; }
+.gpi-tier-4 { background: #f4d33d; }
+.gpi-badge-bar {
+  height: 4px;
+  margin: 4px 0 2px;
+  border-radius: 2px;
+  background: var(--borderColor-muted, #d8dee4);
+  overflow: hidden;
+}
+.gpi-badge-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gpi-badge, #2da44e);
+  animation: gpi-badge-grow 0.6s ease-out;
+}
+@keyframes gpi-badge-grow { from { transform: scaleX(0); transform-origin: left; } }
+.gpi-badge-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px 0 2px;
+  border-top: 1px solid var(--borderColor-muted, #d8dee4);
+}
+.gpi-badge-chip { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 6px; }
+.gpi-badge-chip .gpi-tier { position: absolute; top: 22px; right: 4px; }
+.gpi-badge-chip-name { font-size: 10px; line-height: 1.2; text-align: center; color: var(--fgColor-muted, #656d76); }

@@ -36,6 +36,7 @@
 - **Repo Growth Timeline** - Bar chart showing repository creation history by year
 - **Community & Impact** - Repos contributed to, organizations, follower ratio, account age
 - **Profile Comparison** - Compare any profile against your own (contributions, stars, repos, PRs, forks, followers)
+- **Achievements** - GitHub's own badges with the earned tier read from the profile and progress to the next tier ("14 of 16 for x3"), plus seven GitScope badges counted from public activity: Open Sourcerer, Heart On Your Sleeve, Reviewer, Bug Reporter, Maintainer, Publisher and Long Service
 - **Dark Theme** - Automatically adapts to GitHub's light/dark theme
 - **Caching** - 5-minute TTL to avoid redundant API calls
 
@@ -44,6 +45,7 @@
 - **Dashboard** - Personal analytics dashboard with traffic data (views, clones, referrers), current star/fork totals, and per-repo drill-down. Requires GitHub OAuth with `repo` scope for traffic API access.
 - **Repo Detail** - Per-repository traffic charts, referrer breakdown, and stats (views, clones, stars, forks, issues)
 - **Compare Tool** - Side-by-side profile comparison with up to 17 head-to-head stats (PR merge rate, issue close rate, weekend %, contributed to, organizations, and more)
+- **Achievements** - Badge progress for any username, with the same badge definitions as the extension (`shared/achievements.json`)
 - **Leaderboard** - Rank yourself against everyone you follow, sortable by stars, repos, followers, forks, or languages
 - **Leaderboard Caching** - Results cached locally for 10 minutes to avoid rate limits
 - **Dashboard Caching** - Dashboard data cached locally for 5 minutes; manual "Sync Now" button for refresh
@@ -96,20 +98,22 @@ GitScope/
       api.js                 # GitHub GraphQL queries (parameterized)
       charts.js              # Pure CSS/SVG chart rendering + analytics
       dashboard.js           # Panel construction and injection
+      achievements.js        # Badge tiers, progress, earned badges read from the profile
       storage.js             # Chrome storage + caching helpers
       utils.js               # Utility functions
       popup.js               # Popup OAuth management
       auth-callback.js       # OAuth callback token capture
   website/                   # Landing page + web tools (React + TS)
     src/
-      pages/                 # Landing, Compare, Leaderboard, Dashboard, RepoDetail, Privacy
-      components/            # Header, Footer
+      pages/                 # Landing, Compare, Leaderboard, Achievements, Dashboard, RepoDetail, Privacy
+      components/            # Header, Footer, Medallion (badge art)
       components/charts/     # StatCard, TrafficAreaChart, TopReposBarChart, ReferrersChart, Sparkline
       lib/                   # GitHub API, analytics, auth, dashboard utilities
     vite.config.ts           # Builds to docs/ for GitHub Pages
   worker/                    # Cloudflare Worker (OAuth token exchange)
     index.js                 # Handles extension + web OAuth flows
     wrangler.toml            # Wrangler config
+  shared/achievements.json   # Badge definitions and Octicon paths, used by extension and website
   docs/                      # Built website (deployed to GitHub Pages)
   build.js                   # esbuild bundler for extension
   package.json
