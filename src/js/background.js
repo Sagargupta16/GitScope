@@ -106,6 +106,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Code search has no GraphQL equivalent. Only the total is returned, and a
+  // failure (rate limit, no access) resolves to null so one badge shows
+  // "unavailable" instead of failing the others.
+  if (message.type === "GPI_CODE_SEARCH") {
+    const url = new URL("https://api.github.com/search/code");
+    url.searchParams.set("q", String(message.query));
+    url.searchParams.set("per_page", "1");
+    fetch(url, {
+      headers: { "Authorization": `Bearer ${message.token}`, "Accept": "application/vnd.github+json" },
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => sendResponse(Number.isInteger(data?.total_count) ? { total_count: data.total_count } : null))
+      .catch(() => sendResponse(null));
+    return true;
+  }
+
   if (message.type === "GPI_FETCH_USER") {
     fetch("https://api.github.com/user", {
       headers: { "Authorization": `Bearer ${message.token}` }

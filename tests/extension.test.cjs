@@ -109,7 +109,23 @@ function profile(login, nodes = [repo("one")], hasNextPage = false) {
     repositoriesContributedTo: { totalCount: 1 }, organizations: { totalCount: 1 },
   };
 }
+function achievementsResponse(login) {
+  const count = issueCount => ({ issueCount });
+  return {
+    user: {
+      createdAt: "2020-01-01T00:00:00Z",
+      repositories: { nodes: [{ stargazerCount: 20 }] },
+      answers: { totalCount: 0, nodes: [] },
+      issueComments: { nodes: [] },
+      discussionComments: { nodes: [] },
+    },
+    pullShark: count(3), openSourcerer: count(1), reviewer: count(0), bugReporter: count(0),
+    maintainer: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [], login },
+  };
+}
 function responder(message) {
+  if (message.type === "GPI_CODE_SEARCH") return { total_count: 0 };
+  if (message.query.includes("query Achievements")) return achievementsResponse(message.variables.login);
   if (message.query.includes("viewer")) return { viewer: { login: "alice" } };
   if (message.query.includes("contributionsCollection")) {
     return { user: { contributionsCollection: contributions(message.variables) } };
@@ -242,7 +258,7 @@ function dom() {
   let document;
   class Element {
     constructor(tag) {
-      Object.assign(this, eventTarget(), { tagName: tag, children: [], style: {}, attributes: {}, className: "", innerHTML: "", textContent: "" });
+      Object.assign(this, eventTarget(), { tagName: tag, children: [], style: { setProperty(name, value) { this[name] = String(value); } }, attributes: {}, className: "", innerHTML: "", textContent: "" });
       this.classList = {
         add: name => { this.className += ` ${name}`; },
         contains: name => this.className.split(" ").includes(name),
@@ -284,6 +300,7 @@ function dom() {
   const find = (node, predicate) => all(node).find(predicate) || null;
   document = Object.assign(eventTarget(), {
     createElement: tag => new Element(tag), createElementNS: (_ns, tag) => new Element(tag),
+    createTextNode: text => Object.assign(new Element("#text"), { textContent: String(text), innerHTML: String(text) }),
     getElementById: id => find(document.body, e => e.id === id),
     querySelector(selector) {
       if (selector === ".Layout-sidebar .h-card") return find(document.body, e => e.classList.contains("h-card"));

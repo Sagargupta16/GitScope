@@ -61,6 +61,33 @@ const features = [
       </svg>
     ),
   },
+  {
+    title: "Achievements",
+    description: "GitHub's badges with progress to the next tier, plus GitScope badges for reviews, fixes and merged open source work.",
+    icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="9" r="6" /><polyline points="8.5 14 7 22 12 19 17 22 15.5 14" />
+      </svg>
+    ),
+  },
+  {
+    title: "Traffic Dashboard",
+    description: "Views, clones and referrers across your repositories, with a page for each repo.",
+    icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+      </svg>
+    ),
+  },
+  {
+    title: "Leaderboard",
+    description: "Rank yourself against everyone you follow by stars, repos, followers, forks or languages.",
+    icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" /><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4" />
+      </svg>
+    ),
+  },
 ];
 
 export function Landing() {

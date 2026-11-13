@@ -9,6 +9,7 @@ import {
   computeWeekendPct, computePRMergeRate, computeIssueCloseRate,
   renderRepoTimeline
 } from "./charts.js";
+import { ACHIEVEMENTS, badgeState, tierLabel } from "./achievements.js";
 
 function el(tag, className, innerHTML) {
   const e = document.createElement(tag);
@@ -75,10 +76,15 @@ function contributionSection(contribs) {
   const contribStats = el("div", "gpi-contrib-stats");
   for (const seg of donutData.segments) {
     if (seg.value === 0) continue;
-    contribStats.appendChild(el("div", "gpi-contrib-row",
-      `<span class="gpi-pr-dot" style="background:${seg.color}"></span>` +
+    // Text node, not innerHTML: through innerHTML a "<1%" slice opened a tag
+    // and dropped the rest of the line.
+    const row = el("div", "gpi-contrib-row");
+    const dot = el("span", "gpi-pr-dot");
+    dot.style.background = seg.color;
+    row.append(dot, document.createTextNode(
       `${seg.label}: ${formatNumber(seg.value)} (${segmentPercent(seg.value, donutData.total)}%)`
     ));
+    contribStats.appendChild(row);
   }
   contribContent.appendChild(contribStats);
   contribSection.appendChild(contribContent);
@@ -214,7 +220,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
     { label: "PR Rate", value: `${prMergeRate}%`, raw: `${mergedPRs} merged of ${mergedPRs + openPRs + closedPRs} total` },
     { label: "Repos", value: formatNumber(user.repositories.totalCount), raw: user.repositories.totalCount.toLocaleString() },
     { label: "Forked", value: formatNumber(totalForksReceived), raw: `${totalForksReceived.toLocaleString()} forks of your repos` },
-    { label: "Issues", value: `${issueCloseRate}% closed`, raw: `${closedIssues} closed of ${closedIssues + openIssues} total` },
+    { label: "Issues Closed", value: `${issueCloseRate}%`, raw: `${closedIssues} closed of ${closedIssues + openIssues} total` },
   ];
   for (const stat of stats) {
     const card = el("div", "gpi-stat-card",
@@ -391,4 +397,200 @@ export function showLoadingSkeleton() {
     `<div class="gpi-section"><div class="gpi-skeleton-line" style="width:100%;height:8px;border-radius:4px"></div></div>`;
 
   return injectDashboard(skeleton);
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+let medallionId = 0;
+
+function svgNode(tag, attributes) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+  return node;
+}
+
+// Mixes a #rrggbb colour toward black (amount < 0) or white (amount > 0).
+function shade(hex, amount) {
+  const target = amount < 0 ? 0 : 255;
+  const channels = [1, 3, 5].map(i => Number.parseInt(hex.slice(i, i + 2), 16));
+  return `#${channels.map(c => Math.round(c + (target - c) * Math.abs(amount)).toString(16).padStart(2, "0")).join("")}`;
+}
+
+// A medallion in the style of GitHub's achievement art: a domed disc in the
+// badge colour, the Octicon GitHub uses for that kind of work as the emblem, and
+// a rim that turns bronze, silver and gold at x2, x3 and x4.
+function badgeMedallion(definition, level) {
+  const id = `gpi-medal-${++medallionId}`;
+  const [rimLight, rimDark] = ACHIEVEMENTS.rims[String(level)] ?? [shade(definition.color, 0.35), shade(definition.color, -0.45)];
+  const svg = svgNode("svg", { viewBox: "0 0 64 64", width: 34, height: 34, "aria-hidden": "true", class: "gpi-medallion" });
+  const defs = svgNode("defs", {});
+  const rim = svgNode("linearGradient", { id: `${id}-rim`, x1: 0, y1: 0, x2: 1, y2: 1 });
+  rim.append(svgNode("stop", { offset: 0, "stop-color": rimLight }), svgNode("stop", { offset: 1, "stop-color": rimDark }));
+  const disc = svgNode("radialGradient", { id: `${id}-disc`, cx: "38%", cy: "30%", r: "78%" });
+  disc.append(
+    svgNode("stop", { offset: 0, "stop-color": shade(definition.color, 0.55) }),
+    svgNode("stop", { offset: 0.55, "stop-color": definition.color }),
+    svgNode("stop", { offset: 1, "stop-color": shade(definition.color, -0.4) }),
+  );
+  defs.append(rim, disc);
+  svg.append(
+    defs,
+    svgNode("circle", { cx: 32, cy: 33, r: 30, fill: "#000", opacity: 0.18 }),
+    svgNode("circle", { cx: 32, cy: 32, r: 30, fill: `url(#${id}-rim)` }),
+    svgNode("circle", { cx: 32, cy: 32, r: 24.5, fill: `url(#${id}-disc)` }),
+    svgNode("circle", { cx: 32, cy: 32, r: 24.5, fill: "none", stroke: "#fff", "stroke-opacity": 0.35, "stroke-width": 1.2 }),
+  );
+  const emblem = (fill, opacity, dy) => {
+    const group = svgNode("g", { transform: `translate(15.6 ${15.6 + dy}) scale(2.05)`, fill, opacity });
+    for (const d of ACHIEVEMENTS.icons[definition.icon] ?? []) group.appendChild(svgNode("path", { d }));
+    return group;
+  };
+  svg.append(emblem(shade(definition.color, -0.6), 0.35, 1.2), emblem("#fff", 1, 0));
+  svg.appendChild(svgNode("path", { d: "M14 26a19 19 0 0 1 36 0a26 18 0 0 0-36 0z", fill: "#fff", opacity: 0.22 }));
+  return svg;
+}
+
+function nextTierName(level) {
+  return level === 0 ? "the badge" : `x${level + 1}`;
+}
+
+function badgeCountText(definition, state, earnedKnown) {
+  const unit = definition.id === "long-service" ? " years" : "";
+  if (!definition.metric) {
+    if (!earnedKnown) return "Shown on GitHub only";
+    return state.level > 0 ? "Earned" : "Not earned yet";
+  }
+  if (state.count === null) return "Unavailable right now";
+  // Exact numbers: "149 of 1,024" reads clearly where "1.0k" does not.
+  const count = `${state.atLeast ? "at least " : ""}${state.count.toLocaleString("en-US")}`;
+  if (state.next === null) return `${count}${unit}, top tier`;
+  return `${count} of ${state.next.toLocaleString("en-US")}${unit} for ${nextTierName(state.level)}`;
+}
+
+function badgePercent(definition, state) {
+  if (state.next === null) return state.level > 0 ? 100 : 0;
+  if (state.count === null) return 0;
+  const previous = definition.thresholds[state.level - 1] ?? 0;
+  const span = state.next - previous;
+  return Math.max(0, Math.min(100, ((state.count - previous) / span) * 100));
+}
+
+function badgeRow(definition, state, earnedKnown) {
+  const row = el("div", "gpi-badge-row");
+  row.dataset.level = String(state.level);
+  row.dataset.badge = definition.id;
+  row.style.setProperty("--gpi-badge", definition.color);
+
+  const ring = el("span", "gpi-badge-ring");
+  if (state.image) {
+    const image = document.createElement("img");
+    image.src = state.image;
+    image.alt = "";
+    image.width = 32;
+    image.height = 32;
+    ring.appendChild(image);
+  } else {
+    ring.appendChild(badgeMedallion(definition, state.level));
+  }
+
+  const body = el("div", "gpi-badge-body");
+  const head = el("div", "gpi-badge-head");
+  const name = el("span", "gpi-badge-name");
+  name.textContent = definition.name;
+  head.appendChild(name);
+  const tier = tierLabel(state.level);
+  if (tier) {
+    const chip = el("span", `gpi-tier gpi-tier-${state.level}`);
+    chip.textContent = tier;
+    head.appendChild(chip);
+  }
+  const rule = el("div", "gpi-badge-rule");
+  rule.textContent = definition.rule;
+  const count = el("div", "gpi-badge-count");
+  count.textContent = badgeCountText(definition, state, earnedKnown);
+
+  body.append(head, rule);
+  if (definition.metric) {
+    const bar = el("div", "gpi-badge-bar");
+    const fill = el("span");
+    fill.style.width = `${badgePercent(definition, state).toFixed(1)}%`;
+    bar.appendChild(fill);
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", count.textContent);
+    body.appendChild(bar);
+  }
+  body.appendChild(count);
+  row.append(ring, body);
+  return row;
+}
+
+function badgeGroup(title, definitions, metrics, earned, official) {
+  const group = el("div", "gpi-badge-group");
+  const heading = el("div", "gpi-badge-group-title");
+  heading.textContent = title;
+  group.appendChild(heading);
+  // Badges with no count to show only say earned or not, so they share one strip.
+  const strip = el("div", "gpi-badge-strip");
+  for (const definition of definitions) {
+    const state = badgeState(definition, metrics, earned, official);
+    if (definition.metric) group.appendChild(badgeRow(definition, state, Boolean(earned)));
+    else strip.appendChild(badgeChip(definition, state, Boolean(earned)));
+  }
+  if (strip.children.length) group.appendChild(strip);
+  return group;
+}
+
+function badgeChip(definition, state, earnedKnown) {
+  const chip = el("span", "gpi-badge-chip");
+  chip.dataset.level = String(state.level);
+  chip.dataset.badge = definition.id;
+  chip.style.setProperty("--gpi-badge", definition.color);
+  const status = badgeCountText(definition, state, earnedKnown);
+  const tier = tierLabel(state.level);
+  chip.title = `${definition.name}${tier ? ` ${tier}` : ""}: ${definition.rule}. ${status}.`;
+  chip.setAttribute("aria-label", chip.title);
+  chip.setAttribute("role", "img");
+  chip.tabIndex = 0;
+  const ring = el("span", "gpi-badge-ring");
+  if (state.image) {
+    const image = document.createElement("img");
+    image.src = state.image;
+    image.alt = "";
+    ring.appendChild(image);
+  } else {
+    ring.appendChild(badgeMedallion(definition, state.level));
+  }
+  chip.appendChild(ring);
+  if (tier) {
+    const label = el("span", `gpi-tier gpi-tier-${state.level}`);
+    label.textContent = tier;
+    chip.appendChild(label);
+  }
+  const name = el("span", "gpi-badge-chip-name");
+  name.textContent = definition.name;
+  chip.appendChild(name);
+  return chip;
+}
+
+// state: "loading", "error" or "ready". earned is the Map read from the profile
+// page, or null when the page lists no badges.
+export function buildAchievementsSection(state, metrics = null, earned = null) {
+  const section = el("div", "gpi-section gpi-achievements");
+  section.id = "gpi-achievements";
+  section.appendChild(el("div", "gpi-section-title", "Achievements"));
+  if (state !== "ready") {
+    const status = el("p", "gpi-badge-status");
+    status.setAttribute("role", "status");
+    status.textContent = state === "loading" ? "Counting achievements..." : "Could not load achievement counts. They refresh on the next visit.";
+    section.appendChild(status);
+    if (state === "loading") return section;
+  }
+  section.appendChild(badgeGroup("GitHub", ACHIEVEMENTS.official, metrics, earned, true));
+  section.appendChild(badgeGroup("GitScope", ACHIEVEMENTS.gitscope, metrics, earned, false));
+  return section;
+}
+
+export function showAchievements(panel, section) {
+  panel.querySelector("#gpi-achievements")?.remove();
+  panel.appendChild(section);
 }
