@@ -78,7 +78,8 @@ function contributionSection(contribs) {
     if (seg.value === 0) continue;
     contribStats.appendChild(el("div", "gpi-contrib-row",
       `<span class="gpi-pr-dot" style="background:${seg.color}"></span>` +
-      `${seg.label}: ${formatNumber(seg.value)} (${segmentPercent(seg.value, donutData.total)}%)`
+      // Escaped: this string goes through innerHTML, and a raw "<1" opened a tag that ate the rest of the line.
+      `${seg.label}: ${formatNumber(seg.value)} (${segmentPercent(seg.value, donutData.total).replace("<", "&lt;")}%)`
     ));
   }
   contribContent.appendChild(contribStats);
@@ -215,7 +216,7 @@ export function buildInsightsPanel(data, viewerStats = null) {
     { label: "PR Rate", value: `${prMergeRate}%`, raw: `${mergedPRs} merged of ${mergedPRs + openPRs + closedPRs} total` },
     { label: "Repos", value: formatNumber(user.repositories.totalCount), raw: user.repositories.totalCount.toLocaleString() },
     { label: "Forked", value: formatNumber(totalForksReceived), raw: `${totalForksReceived.toLocaleString()} forks of your repos` },
-    { label: "Issues", value: `${issueCloseRate}% closed`, raw: `${closedIssues} closed of ${closedIssues + openIssues} total` },
+    { label: "Issues Closed", value: `${issueCloseRate}%`, raw: `${closedIssues} closed of ${closedIssues + openIssues} total` },
   ];
   for (const stat of stats) {
     const card = el("div", "gpi-stat-card",
