@@ -76,11 +76,15 @@ function contributionSection(contribs) {
   const contribStats = el("div", "gpi-contrib-stats");
   for (const seg of donutData.segments) {
     if (seg.value === 0) continue;
-    contribStats.appendChild(el("div", "gpi-contrib-row",
-      `<span class="gpi-pr-dot" style="background:${seg.color}"></span>` +
-      // Escaped: this string goes through innerHTML, and a raw "<1" opened a tag that ate the rest of the line.
-      `${seg.label}: ${formatNumber(seg.value)} (${segmentPercent(seg.value, donutData.total).replace("<", "&lt;")}%)`
+    // Text node, not innerHTML: through innerHTML a "<1%" slice opened a tag
+    // and dropped the rest of the line.
+    const row = el("div", "gpi-contrib-row");
+    const dot = el("span", "gpi-pr-dot");
+    dot.style.background = seg.color;
+    row.append(dot, document.createTextNode(
+      `${seg.label}: ${formatNumber(seg.value)} (${segmentPercent(seg.value, donutData.total)}%)`
     ));
+    contribStats.appendChild(row);
   }
   contribContent.appendChild(contribStats);
   contribSection.appendChild(contribContent);

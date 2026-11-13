@@ -300,6 +300,7 @@ function dom() {
   const find = (node, predicate) => all(node).find(predicate) || null;
   document = Object.assign(eventTarget(), {
     createElement: tag => new Element(tag), createElementNS: (_ns, tag) => new Element(tag),
+    createTextNode: text => Object.assign(new Element("#text"), { textContent: String(text), innerHTML: String(text) }),
     getElementById: id => find(document.body, e => e.id === id),
     querySelector(selector) {
       if (selector === ".Layout-sidebar .h-card") return find(document.body, e => e.classList.contains("h-card"));
